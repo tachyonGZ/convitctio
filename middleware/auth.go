@@ -2,7 +2,7 @@ package middlewware
 
 import "github.com/gin-gonic/gin"
 
-func Auth() gin.HandlerFunc {
+func AuthRequired() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		user, _ := c.Get("user")
 

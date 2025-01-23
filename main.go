@@ -4,6 +4,7 @@ import (
 	"conviction/controller"
 	"conviction/db"
 	middlewware "conviction/middleware"
+	"conviction/model"
 
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-contrib/sessions/memstore"
@@ -12,6 +13,7 @@ import (
 
 func init() {
 	db.InitDB()
+	model.Migration(db.GetDB())
 }
 
 func main() {
@@ -35,7 +37,9 @@ func InitRouter() *gin.Engine {
 		user.POST("", controller.UserRegister)
 	}
 
-	file := v1.Group("file")
+	auth := v1.Group("")
+	auth.Use(middlewware.AuthRequired())
+	file := auth.Group("file")
 	{
 
 		file.PUT("upload", controller.CreateUploadSession)

@@ -75,3 +75,9 @@ func (fs *FileSystem) OpenFile(target *model.File) util.ReadSeekCloser {
 func (fs *FileSystem) CloseFile(rsc util.ReadSeekCloser) {
 	rsc.Close()
 }
+
+func (fs *FileSystem) UpdateFile(target *model.File, file FileStream) {
+	savePath := target.Path
+
+	fs.Adapter.Put(file, savePath, file.GetSize())
+}

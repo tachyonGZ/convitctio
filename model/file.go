@@ -1,6 +1,8 @@
 package model
 
-import "gorm.io/gorm"
+import (
+	"gorm.io/gorm"
+)
 
 type File struct {
 	gorm.Model
@@ -9,7 +11,7 @@ type File struct {
 	Path   string `gorm:"type:text"`
 }
 
-func GetFileByID() File {
+func GetFileByID(ID uint) File {
 	var u File
 	return u
 }
