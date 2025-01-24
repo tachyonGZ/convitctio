@@ -7,17 +7,18 @@ import (
 	"conviction/util"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"net/url"
 	"strconv"
-	"strings"
 
 	"github.com/coocood/freecache"
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 )
 
 func CreateUploadSession(c *gin.Context) {
+
+	var ttl int = 6000
 
 	// check binding
 	var param struct {
@@ -41,52 +42,56 @@ func CreateUploadSession(c *gin.Context) {
 	}
 	fs := filesystem.NewFileSystem(u.(*model.User))
 
-	file := filesystem.FileStream{
-		File:        io.NopCloser(strings.NewReader("")),
+	// create placeholder
+	head := filesystem.FileHead{
 		MimeType:    param.MimeType,
 		Name:        param.Name,
 		Size:        param.Size,
 		VirtualPath: param.Path,
 	}
+	fs.CreatePlaceHolder(&head)
 
-	var callbackKey string
-
-	// cache upload session
+	// store session in cache
+	uu, _ := uuid.NewRandom()
+	uuM, _ := uu.MarshalText()
+	key := string(uuM)
 	uploadSession := serializer.UploadSession{
-		Key:            callbackKey,
+		Key:            key,
 		UID:            fs.Owner.ID,
-		VirtualPath:    file.VirtualPath,
-		Name:           file.Name,
-		Size:           file.Size,
-		SavePath:       file.SavePath,
-		LastModified:   file.LastModified,
+		VirtualPath:    head.VirtualPath,
+		Name:           head.Name,
+		Size:           head.Size,
+		SavePath:       head.SavePath,
+		LastModified:   head.LastModified,
 		CallbackSecret: util.RandStringRunes(32),
 	}
+	b, _ := json.Marshal(uploadSession)
+	cache, _ := c.Get("cache")
+	cache.(*freecache.Cache).Set(append([]byte("callback_"), key...), b, ttl)
 
 	// get credential
 	credential := fs.Adapter.Token(uploadSession)
-	// create placeholder
-
-	// session
-	b, _ := json.Marshal(uploadSession)
-	cache, _ := c.Get("cache")
-	cache.(*freecache.Cache).Set([]byte("callback_"+callbackKey), b, 6000)
 
 	c.JSON(200, credential)
 }
 
 func UploadBySession(c *gin.Context) {
 	// binding
-	var j struct {
-		ID string `uri:"session_id" binding:"required"`
+	/*
+		var j struct {
+			ID string `uri:"session_id" binding:"required"`
+		}
+	*/
+	var param struct {
+		ID string `json:"session_id" binding:"required"`
 	}
-	if err := c.ShouldBindJSON(&j); err != nil {
+	if err := c.ShouldBindJSON(&param); err != nil {
 		c.JSON(200, "")
 	}
 
-	// session
+	// get upload session from cache
 	cache, _ := c.Get("cache")
-	uploadSessionRaw, _ := cache.(*freecache.Cache).Get([]byte("callback_" + j.ID))
+	uploadSessionRaw, _ := cache.(*freecache.Cache).Get([]byte("callback_" + param.ID))
 	var uploadSession serializer.UploadSession
 	json.Unmarshal(uploadSessionRaw, &uploadSession)
 
@@ -94,15 +99,25 @@ func UploadBySession(c *gin.Context) {
 	u, _ := c.Get("user")
 	fs := filesystem.NewFileSystem(u.(*model.User))
 
-	file := filesystem.FileStream{
-		File:        c.Request.Body,
+	/*
+		file := filesystem.FileStream{
+			File:        c.Request.Body,
+			MimeType:    c.Request.Header.Get("Content-Type"),
+			Name:        uploadSession.Name,
+			Size:        uploadSession.Size,
+			VirtualPath: uploadSession.VirtualPath,
+		}
+	*/
+
+	head := filesystem.FileHead{
 		MimeType:    c.Request.Header.Get("Content-Type"),
 		Name:        uploadSession.Name,
+		SavePath:    uploadSession.SavePath,
 		Size:        uploadSession.Size,
 		VirtualPath: uploadSession.VirtualPath,
 	}
 
-	fs.Upload(file)
+	fs.Upload(&head, c.Request.Body)
 }
 
 func CreateDownloadSession(c *gin.Context) {
@@ -148,7 +163,7 @@ func DownloadBySession(c *gin.Context) {
 	cache, _ := c.Get("cache")
 	b, _ := cache.(*freecache.Cache).Get([]byte("download_" + j.ID))
 	var target model.File
-	json.Unmarshal(b, target)
+	json.Unmarshal(b, &target)
 
 	// prepare for download
 	rsc := fs.OpenFile(&target)

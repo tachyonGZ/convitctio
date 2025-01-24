@@ -3,7 +3,7 @@ package serializer
 import "time"
 
 type UploadSession struct {
-	Key            string     // 上传会话 GUID
+	Key            string     // UUID
 	UID            uint       // 发起者
 	VirtualPath    string     // 用户文件路径，不含文件名
 	Name           string     // 文件名

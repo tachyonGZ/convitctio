@@ -4,8 +4,10 @@ import (
 	adapter "conviction/filesystem/driver"
 	"conviction/model"
 	"conviction/util"
+	"io"
 	"path"
 	"strconv"
+	"strings"
 	"sync"
 )
 
@@ -31,28 +33,28 @@ func NewFileSystem(Owner *model.User) *FileSystem {
 	return fs
 }
 
-func (fs *FileSystem) GrenateSavePath(file FileStream) string {
+func (fs *FileSystem) GrenateSavePath(fmd *FileHead) string {
 	strUserID := strconv.FormatUint(uint64(fs.Owner.Model.ID), 10)
-	strPath := file.VirtualPath
-	strName := file.Name
+	strPath := fmd.VirtualPath
+	strName := fmd.Name
 	return path.Join("upload", strUserID, strPath, strName)
 }
 
-func (fs *FileSystem) Upload(file FileStream) {
+func (fs *FileSystem) Upload(head *FileHead, body IFileBody) {
 
 	// grenate save path
-	savePath := fs.GrenateSavePath(file)
+	savePath := fs.GrenateSavePath(head)
 
 	// implement
-	fs.Adapter.Put(file, savePath, file.GetSize())
-	fs.AfterUpload(file)
+	fs.Adapter.Put(body, savePath, head.GetSize())
+	fs.AfterUpload(head)
 }
 
-func (fs *FileSystem) AfterUpload(file FileStream) {
+func (fs *FileSystem) AfterUpload(head *FileHead) {
 	target := model.File{
 		UserID: fs.Owner.ID,
-		Name:   file.Name,
-		Path:   file.SavePath,
+		Name:   head.Name,
+		Path:   head.SavePath,
 	}
 
 	target.Insert()
@@ -77,7 +79,15 @@ func (fs *FileSystem) CloseFile(rsc util.ReadSeekCloser) {
 }
 
 func (fs *FileSystem) UpdateFile(target *model.File, file FileStream) {
-	savePath := target.Path
+	realPath := target.Path
 
-	fs.Adapter.Put(file, savePath, file.GetSize())
+	fs.Adapter.Put(file, realPath, file.GetSize())
+}
+
+func (fs *FileSystem) CreatePlaceHolder(fmd *FileHead) {
+	// grenate save path
+	fmd.SavePath = fs.GrenateSavePath(fmd)
+
+	// implement
+	fs.Adapter.Put(io.NopCloser(strings.NewReader("")), fmd.SavePath, fmd.GetSize())
 }
