@@ -49,3 +49,19 @@ func RandStringRunes(n int) string {
 	}
 	return string(b)
 }
+
+// SplitPath 分割路径为列表
+func SplitPath(path string) []string {
+
+	if len(path) == 0 || path[0] != '/' {
+		return []string{}
+	}
+
+	if path == "/" {
+		return []string{"/"}
+	}
+
+	pathSplit := strings.Split(path, "/")
+	pathSplit[0] = "/"
+	return pathSplit
+}
