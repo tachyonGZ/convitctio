@@ -47,6 +47,7 @@ func (fs *FileSystem) Upload(head *FileHead, body IFileBody) {
 
 	// implement
 	fs.Adapter.Put(body, savePath, head.GetSize())
+
 	fs.AfterUpload(head)
 }
 
@@ -90,4 +91,30 @@ func (fs *FileSystem) CreatePlaceHolder(fmd *FileHead) {
 
 	// implement
 	fs.Adapter.Put(io.NopCloser(strings.NewReader("")), fmd.SavePath, fmd.GetSize())
+}
+
+func (fs *FileSystem) CreateDirectory(dirPath string) *model.Directory {
+
+	dirPath = path.Clean(dirPath)
+	pathList := util.SplitPath(dirPath)
+
+	var currentDir *model.Directory
+	for _, dirName := range pathList {
+
+		var err error
+		currentDir, err = currentDir.GetChild(dirName)
+		if err != nil {
+			continue
+		}
+
+		currentDir = &model.Directory{
+			Name:     dirName,
+			OwnerID:  fs.Owner.ID,
+			ParentID: currentDir.ID,
+		}
+
+		currentDir.Create()
+	}
+
+	return currentDir
 }
