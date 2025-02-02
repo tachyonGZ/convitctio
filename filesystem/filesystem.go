@@ -118,3 +118,24 @@ func (fs *FileSystem) CreateDirectory(dirPath string) *model.Directory {
 
 	return currentDir
 }
+
+func (fs *FileSystem) OpenDirectory(dirPath string) *model.Directory {
+	dirPath = path.Clean(dirPath)
+	pathList := util.SplitPath(dirPath)
+
+	var dir *model.Directory
+	for _, dirName := range pathList {
+		var err error
+		dir, err = dir.GetChild(dirName)
+		if err == nil {
+			return nil
+		}
+	}
+	return dir
+}
+
+func (fs *FileSystem) ReadDirectory(dir *model.Directory) ([]model.Directory, []model.File) {
+	childDir, _ := dir.GetChildDirectory()
+	childFile, _ := dir.GetChildFile()
+	return childDir, childFile
+}

@@ -20,8 +20,10 @@ func CreateDirectory(c *gin.Context) {
 		c.JSON(200, "")
 	}
 
+	// create
 	fs.CreateDirectory(param.Path)
 
+	// response
 	c.JSON(200, "")
 }
 
@@ -38,33 +40,33 @@ func ListDirectory(c *gin.Context) {
 		c.JSON(200, "")
 	}
 
+	// read
 	dir := fs.OpenDirectory(param.Path)
 	cd, cf := fs.ReadDirectory(dir)
 
+	// convert directory model to json object
 	type DirObj struct {
 		Name string `json:"name"`
 	}
-
 	dirObjs := make([]DirObj, 0, len(cd))
-
 	for _, subDir := range cd {
 		dirObjs = append(dirObjs, DirObj{
 			Name: subDir.Name,
 		})
 	}
 
+	// convert file model to json object
 	type FileObj struct {
 		Name string `json:"name"`
 	}
-
 	fileObjs := make([]FileObj, 0, len(cd))
-
 	for _, subFile := range cf {
 		fileObjs = append(fileObjs, FileObj{
 			Name: subFile.Name,
 		})
 	}
 
+	// response
 	c.JSON(
 		200,
 		struct {

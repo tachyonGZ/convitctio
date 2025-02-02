@@ -3,8 +3,12 @@ package main
 import (
 	"conviction/controller"
 	"conviction/db"
-	middlewware "conviction/middleware"
+	"conviction/middleware"
 	"conviction/model"
+	"log"
+	"net/http"
+	"os"
+	"os/signal"
 
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-contrib/sessions/memstore"
@@ -17,8 +21,29 @@ func init() {
 }
 
 func main() {
+
+	// release database
+	defer func() {
+		db.ReleaseDB()
+	}()
+
+	// http server
 	api := InitRouter()
-	api.Run(":8080")
+	srv := &http.Server{
+		Addr:    ":8080",
+		Handler: api,
+	}
+	go func() {
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("listen: %s\n", err)
+		}
+	}()
+
+	// quit signal
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, os.Interrupt)
+	<-quit
+	log.Println("shutdown server...")
 }
 
 func InitRouter() *gin.Engine {
@@ -28,8 +53,8 @@ func InitRouter() *gin.Engine {
 
 	store := memstore.NewStore([]byte("secret"))
 	v1.Use(sessions.Sessions("convictio", store))
-	v1.Use(middlewware.CurrentUser())
-	v1.Use(middlewware.MemoCache())
+	v1.Use(middleware.CurrentUser())
+	v1.Use(middleware.MemoCache())
 
 	user := v1.Group("user")
 	{
@@ -38,7 +63,7 @@ func InitRouter() *gin.Engine {
 	}
 
 	auth := v1.Group("")
-	auth.Use(middlewware.AuthRequired())
+	auth.Use(middleware.AuthRequired())
 	file := auth.Group("file")
 	{
 
@@ -46,6 +71,15 @@ func InitRouter() *gin.Engine {
 		file.POST("upload", controller.UploadBySession)
 		file.PUT("download", controller.CreateDownloadSession)
 		file.GET("download", controller.DownloadBySession)
+	}
+
+	directory := auth.Group("directory")
+	{
+		// create a directory
+		directory.POST("", controller.CreateDirectory)
+
+		// list all contents of a directory
+		directory.GET("", controller.ListDirectory)
 	}
 
 	return r

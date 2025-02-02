@@ -6,9 +6,10 @@ import (
 
 type File struct {
 	gorm.Model
-	UserID uint   `gorm:"index:user_id;unique_index:idx_only_one"`
-	Name   string `gorm:"unique_index:idx_only_one"`
-	Path   string `gorm:"type:text"`
+	UserID      uint   `gorm:"index:user_id;unique_index:idx_only_one"`
+	Name        string `gorm:"unique_index:idx_only_one"`
+	Path        string `gorm:"type:text"`
+	DirectoryID uint   `gorm:"index:directory_id;unique_index:idx_only_one"`
 }
 
 func GetFileByID(ID uint) File {

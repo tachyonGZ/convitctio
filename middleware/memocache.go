@@ -1,4 +1,4 @@
-package middlewware
+package middleware
 
 import (
 	"github.com/coocood/freecache"

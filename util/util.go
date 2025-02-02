@@ -51,17 +51,21 @@ func RandStringRunes(n int) string {
 }
 
 // SplitPath 分割路径为列表
-func SplitPath(path string) []string {
+func SplitPath(fullPath string) []string {
+	fullPath = path.Clean(fullPath)
+	var MakeList func(*string) *[]string
+	MakeList = func(p *string) *[]string {
+		if *p == "/" {
+			return new([]string)
+		}
 
-	if len(path) == 0 || path[0] != '/' {
-		return []string{}
+		base := path.Base(*p)
+		*p = path.Dir(*p)
+
+		l := MakeList(p)
+		*l = append(*l, base)
+		return l
 	}
 
-	if path == "/" {
-		return []string{"/"}
-	}
-
-	pathSplit := strings.Split(path, "/")
-	pathSplit[0] = "/"
-	return pathSplit
+	return *MakeList(&fullPath)
 }

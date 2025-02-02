@@ -1,4 +1,4 @@
-package middlewware
+package middleware
 
 import (
 	"conviction/model"

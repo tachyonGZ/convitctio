@@ -13,6 +13,11 @@ func InitDB() {
 	g_db = db
 }
 
+func ReleaseDB() {
+	d, _ := g_db.DB()
+	d.Close()
+}
+
 func GetDB() *gorm.DB {
 	return g_db
 }
