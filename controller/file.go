@@ -2,14 +2,16 @@ package controller
 
 import (
 	"conviction/filesystem"
+	"conviction/memocache"
 	"conviction/model"
 	"conviction/serializer"
 	"conviction/util"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"net/url"
+	"os"
 	"strconv"
+	"time"
 
 	"github.com/coocood/freecache"
 	"github.com/gin-gonic/gin"
@@ -19,25 +21,26 @@ import (
 func CreateUploadSession(c *gin.Context) {
 
 	var ttl int = 6000
-
+	if os.Getenv("DEBUG") != "" {
+		ttl = 0
+	}
 	// check binding
 	var param struct {
-		Path string `json:"path" binding:"required"`
-		Size uint64 `json:"size" binding:"min=0"`
-		Name string `json:"name" binding:"required"`
-		//PolicyID     string `json:"policy_id" binding:"required"`
 		LastModified int64  `json:"last_modified"`
-		MimeType     string `json:"mime_type"`
+		MimeType     string `json:"mime_type" binding:"required"`
+		Name         string `json:"name" binding:"required"`
+		Path         string `json:"path" binding:"required"`
+		Size         uint64 `json:"size" binding:"min=0"`
+		//PolicyID     string `json:"policy_id" binding:"required"`
 	}
 	if err := c.ShouldBindJSON(&param); err != nil {
-		c.String(200, "bad binding")
-		fmt.Println("bad binding")
+		c.String(200, "bad binding"+err.Error())
 	}
 
 	// create file system
 	u, exists := c.Get("user")
 	if !exists {
-		fmt.Println("user not exists")
+		c.String(500, "current user not exists")
 		return
 	}
 	fs := filesystem.NewFileSystem(u.(*model.User))
@@ -49,9 +52,12 @@ func CreateUploadSession(c *gin.Context) {
 		Size:        param.Size,
 		VirtualPath: param.Path,
 	}
-	fs.CreatePlaceHolder(&head)
 
-	// store session in cache
+	if !fs.CreatePlaceHolder(&head) {
+		c.String(500, "placeholder exists")
+	}
+
+	// store session in memocache
 	uu, _ := uuid.NewRandom()
 	uuM, _ := uu.MarshalText()
 	key := string(uuM)
@@ -65,12 +71,13 @@ func CreateUploadSession(c *gin.Context) {
 		LastModified:   head.LastModified,
 		CallbackSecret: util.RandStringRunes(32),
 	}
-	b, _ := json.Marshal(uploadSession)
-	cache, _ := c.Get("cache")
-	cache.(*freecache.Cache).Set(append([]byte("callback_"), key...), b, ttl)
+	memocache.SetJSON(append([]byte("callback_"), key...), uploadSession, ttl)
 
 	// get credential
-	credential := fs.Adapter.Token(uploadSession)
+	credential := serializer.UploadCredential{
+		SessionID: uploadSession.Key,
+		Expires:   time.Now().Add(time.Duration(ttl) * time.Second).Unix(),
+	}
 
 	c.JSON(200, credential)
 }
@@ -86,14 +93,15 @@ func UploadBySession(c *gin.Context) {
 		ID string `json:"session_id" binding:"required"`
 	}
 	if err := c.ShouldBindJSON(&param); err != nil {
-		c.JSON(200, "")
+		c.JSON(500, err.Error())
 	}
 
 	// get upload session from cache
-	cache, _ := c.Get("cache")
-	uploadSessionRaw, _ := cache.(*freecache.Cache).Get([]byte("callback_" + param.ID))
-	var uploadSession serializer.UploadSession
-	json.Unmarshal(uploadSessionRaw, &uploadSession)
+	value, err := memocache.GetJSON([]byte("callback_" + param.ID))
+	if err != nil {
+		c.String(500, err.Error())
+	}
+	uploadSession := value.(serializer.UploadSession)
 
 	// create file system
 	u, _ := c.Get("user")
@@ -189,4 +197,10 @@ func Update(c *gin.Context) {
 	f := filesystem.FileStream{}
 
 	fs.UpdateFile(&target, f)
+}
+
+func Delete(c *gin.Context) {
+	// create file system
+	u, _ := c.Get("user")
+	fs := filesystem.NewFileSystem(u.(*model.User))
 }

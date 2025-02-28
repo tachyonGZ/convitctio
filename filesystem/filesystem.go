@@ -2,6 +2,7 @@ package filesystem
 
 import (
 	adapter "conviction/filesystem/driver"
+	"conviction/filesystem/driver/local"
 	"conviction/model"
 	"conviction/util"
 	"io"
@@ -10,6 +11,12 @@ import (
 	"strings"
 	"sync"
 )
+
+type FileSystem struct {
+	Owner   model.User
+	Target  model.File
+	Adapter adapter.IFileSystemAdapter
+}
 
 var fileSystemPool = sync.Pool{
 	New: func() any {
@@ -21,15 +28,16 @@ func GetFileSystem() *FileSystem {
 	return fileSystemPool.Get().(*FileSystem)
 }
 
-type FileSystem struct {
-	Owner   model.User
-	Target  model.File
-	Adapter adapter.IFileSystemAdapter
+func (fs *FileSystem) DispatchAdapter() error {
+	fs.Adapter = local.FileSystemAdapter{}
+	return nil
 }
 
 func NewFileSystem(Owner *model.User) *FileSystem {
 	fs := GetFileSystem()
 	fs.Owner = *Owner
+
+	fs.DispatchAdapter()
 	return fs
 }
 
@@ -85,12 +93,17 @@ func (fs *FileSystem) UpdateFile(target *model.File, file FileStream) {
 	fs.Adapter.Put(file, realPath, file.GetSize())
 }
 
-func (fs *FileSystem) CreatePlaceHolder(fmd *FileHead) {
+func (fs *FileSystem) CreatePlaceHolder(f *FileHead) bool {
 	// grenate save path
-	fmd.SavePath = fs.GrenateSavePath(fmd)
+	f.SavePath = fs.GrenateSavePath(f)
+
+	if fs.Adapter.IsFileExist(f.SavePath) {
+		return false
+	}
 
 	// implement
-	fs.Adapter.Put(io.NopCloser(strings.NewReader("")), fmd.SavePath, fmd.GetSize())
+	fs.Adapter.Put(io.NopCloser(strings.NewReader("")), f.SavePath, f.GetSize())
+	return true
 }
 
 func (fs *FileSystem) CreateDirectory(dirPath string) *model.Directory {

@@ -40,6 +40,8 @@ func UserLogin(c *gin.Context) {
 	// session
 	session := sessions.Default(c)
 	session.Set("user_id", u.ID)
+	session.Save()
+	fmt.Println("UserLogin: set session")
 
 	c.JSON(200, serializer.Response{})
 }

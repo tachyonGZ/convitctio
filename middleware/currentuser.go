@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"conviction/model"
+	"fmt"
 
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
@@ -13,6 +14,7 @@ func CurrentUser() gin.HandlerFunc {
 
 		uid := session.Get("user_id")
 		if nil == uid {
+			fmt.Println("session not set user_id")
 			c.Next()
 		}
 

@@ -54,7 +54,6 @@ func InitRouter() *gin.Engine {
 	store := memstore.NewStore([]byte("secret"))
 	v1.Use(sessions.Sessions("convictio", store))
 	v1.Use(middleware.CurrentUser())
-	v1.Use(middleware.MemoCache())
 
 	user := v1.Group("user")
 	{
@@ -71,6 +70,7 @@ func InitRouter() *gin.Engine {
 		file.POST("upload", controller.UploadBySession)
 		file.PUT("download", controller.CreateDownloadSession)
 		file.GET("download", controller.DownloadBySession)
+		file.DELETE("", controller.Delete)
 	}
 
 	directory := auth.Group("directory")

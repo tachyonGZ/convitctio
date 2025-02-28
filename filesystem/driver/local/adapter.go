@@ -1,7 +1,6 @@
 package local
 
 import (
-	"context"
 	"conviction/serializer"
 	"conviction/util"
 	"fmt"
@@ -41,7 +40,7 @@ func (fsa FileSystemAdapter) Put(srcFile io.ReadCloser, dst string, size uint64)
 	return err
 }
 
-func (fsa FileSystemAdapter) Delete(ctx context.Context, filePath []string) ([]string, error) {
+func (fsa FileSystemAdapter) Delete(filePath []string) ([]string, error) {
 
 	failedPath := make([]string, 0, len(filePath))
 	var retErr error
@@ -73,6 +72,7 @@ func (fsa FileSystemAdapter) Source(sessionID string) string {
 	return URI.String()
 }
 
+// func (fsa FileSystemAdapter) Token(uploadSession *serializer.UploadSession) *serializer.UploadCredential {
 func (fsa FileSystemAdapter) Token(uploadSession *serializer.UploadSession) *serializer.UploadCredential {
 	if !util.IsNotExist(uploadSession.SavePath) {
 		return nil
@@ -81,4 +81,14 @@ func (fsa FileSystemAdapter) Token(uploadSession *serializer.UploadSession) *ser
 	return &serializer.UploadCredential{
 		SessionID: uploadSession.Key,
 	}
+}
+
+func (fsa FileSystemAdapter) IsFileExist(path string) bool {
+	_, err := os.Stat(path)
+
+	if err == nil {
+		return false
+	}
+
+	return !os.IsNotExist(err)
 }

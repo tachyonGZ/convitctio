@@ -22,5 +22,7 @@ type IFileSystemAdapter interface {
 
 	Source(sessionId string) string
 
-	Token(uploadSession serializer.UploadSession) *serializer.UploadCredential
+	Token(uploadSession *serializer.UploadSession) *serializer.UploadCredential
+
+	IsFileExist(path string) bool
 }
