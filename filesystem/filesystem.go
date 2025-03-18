@@ -48,7 +48,7 @@ func (fs *FileSystem) GrenateSavePath(fmd *FileHead) string {
 	return path.Join("upload", strUserID, strPath, strName)
 }
 
-func (fs *FileSystem) Upload(head *FileHead, body IFileBody) {
+func (fs *FileSystem) Upload(head *FileHead, body IFileBody, pPlaceHolder *model.File) {
 
 	// grenate save path
 	savePath := fs.GrenateSavePath(head)
@@ -56,18 +56,26 @@ func (fs *FileSystem) Upload(head *FileHead, body IFileBody) {
 	// implement
 	fs.Adapter.Put(body, savePath, head.GetSize())
 
-	fs.AfterUpload(head)
+	// placeholder to file
+	pPlaceHolder.PlaceholderToFile()
 }
 
-func (fs *FileSystem) AfterUpload(head *FileHead) {
-	target := model.File{
-		UserID: fs.Owner.ID,
-		Name:   head.Name,
-		Path:   head.SavePath,
-	}
-
-	target.Insert()
+func (fs *FileSystem) Download(fileID uint) (rsc util.ReadSeekCloser) {
+	file, _ := model.GetFileByID(fileID, fs.Owner.ID)
+	rsc, _ = fs.Adapter.Get(file.Path)
+	return
 }
+
+//func (fs *FileSystem) AfterUpload(head *FileHead) {
+//
+//	// record
+//	db.GetDB().Create(
+//		&model.File{
+//			UserID: fs.Owner.ID,
+//			Name:   head.Name,
+//			Path:   head.SavePath,
+//		})
+//}
 
 func (fs *FileSystem) GetDownloadURL(objectID uint, sessionID string) string {
 
@@ -76,15 +84,13 @@ func (fs *FileSystem) GetDownloadURL(objectID uint, sessionID string) string {
 	return source
 }
 
-func (fs *FileSystem) OpenFile(target *model.File) util.ReadSeekCloser {
+func (fs *FileSystem) GetFileHead(fileID uint) (head *FileHead) {
 
-	rsc, _ := fs.Adapter.Get(target.Path)
-
-	return rsc
-}
-
-func (fs *FileSystem) CloseFile(rsc util.ReadSeekCloser) {
-	rsc.Close()
+	file, _ := model.GetFileByID(fileID, fs.Owner.ID)
+	head = &FileHead{
+		Name: file.Name,
+	}
+	return
 }
 
 func (fs *FileSystem) UpdateFile(target *model.File, file FileStream) {
@@ -93,62 +99,97 @@ func (fs *FileSystem) UpdateFile(target *model.File, file FileStream) {
 	fs.Adapter.Put(file, realPath, file.GetSize())
 }
 
-func (fs *FileSystem) CreatePlaceHolder(f *FileHead) bool {
+func (fs *FileSystem) CreatePlaceHolder(head *FileHead, dir *model.Directory) (*model.File, error) {
 	// grenate save path
-	f.SavePath = fs.GrenateSavePath(f)
-
-	if fs.Adapter.IsFileExist(f.SavePath) {
-		return false
-	}
+	head.SavePath = fs.GrenateSavePath(head)
 
 	// implement
-	fs.Adapter.Put(io.NopCloser(strings.NewReader("")), f.SavePath, f.GetSize())
-	return true
+	fs.Adapter.Put(io.NopCloser(strings.NewReader("")), head.SavePath, head.GetSize())
+
+	// record
+	placeholder := model.File{}
+	err := fs.RecordFile(head, dir, &placeholder)
+	return &placeholder, err
 }
 
-func (fs *FileSystem) CreateDirectory(dirPath string) *model.Directory {
+func (fs *FileSystem) RecordFile(head *FileHead, dir *model.Directory, file *model.File) error {
+	*file = model.File{
+		Name:        head.Name,
+		Path:        head.SavePath,
+		UserID:      fs.Owner.ID,
+		Size:        head.Size,
+		DirectoryID: dir.ID,
+	}
 
+	err := file.Create()
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (fs *FileSystem) CreateDirectoryByPath(dirPath string) *model.Directory {
 	dirPath = path.Clean(dirPath)
 	pathList := util.SplitPath(dirPath)
 
 	var currentDir *model.Directory
 	for _, dirName := range pathList {
 
-		var err error
-		currentDir, err = currentDir.GetChild(dirName)
-		if err != nil {
+		if dirName == "/" {
+			currentDir, _ = fs.Owner.Root()
 			continue
 		}
 
-		currentDir = &model.Directory{
-			Name:     dirName,
-			OwnerID:  fs.Owner.ID,
-			ParentID: currentDir.ID,
+		pChild, exist, _ := currentDir.GetChild(dirName)
+		if exist {
+			currentDir = pChild
+			continue
 		}
 
-		currentDir.Create()
+		pChild = &model.Directory{
+			Name:     dirName,
+			OwnerID:  fs.Owner.ID,
+			ParentID: &currentDir.ID,
+		}
+
+		pChild.Create()
+
+		currentDir = pChild
 	}
 
 	return currentDir
 }
 
-func (fs *FileSystem) OpenDirectory(dirPath string) *model.Directory {
+func (fs *FileSystem) OpenDirectory(dirPath string) (*model.Directory, bool, error) {
 	dirPath = path.Clean(dirPath)
 	pathList := util.SplitPath(dirPath)
 
-	var dir *model.Directory
+	var currentDir *model.Directory
 	for _, dirName := range pathList {
-		var err error
-		dir, err = dir.GetChild(dirName)
-		if err == nil {
-			return nil
+
+		if dirName == "/" {
+			currentDir, _ = fs.Owner.Root()
+			continue
 		}
+
+		childDir, exist, _ := currentDir.GetChild(dirName)
+
+		if !exist {
+			return nil, false, nil
+		}
+
+		currentDir = childDir
 	}
-	return dir
+	return currentDir, true, nil
 }
 
-func (fs *FileSystem) ReadDirectory(dir *model.Directory) ([]model.Directory, []model.File) {
+func (fs *FileSystem) ReadDirectory2(dir *model.Directory) ([]model.Directory, []model.File) {
 	childDir, _ := dir.GetChildDirectory()
 	childFile, _ := dir.GetChildFile()
 	return childDir, childFile
+}
+
+func (fs *FileSystem) IsSameNameFileExists(name string, dir *model.Directory) bool {
+	return model.IsSameNameFileExist(name, dir.ID, dir.OwnerID)
 }

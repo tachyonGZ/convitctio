@@ -14,7 +14,7 @@ type IFileSystemAdapter interface {
 
 	// @description			delete one or more delicated file
 	// @param filesPath		path of files
-	Delete(filesPath []string) ([]string, error)
+	Delete(filePath string) error
 
 	// @description			get file content
 	// @param filePath		path of file

@@ -56,10 +56,12 @@ func SplitPath(fullPath string) []string {
 	var MakeList func(*string) *[]string
 	MakeList = func(p *string) *[]string {
 		if *p == "/" {
-			return new([]string)
+			sp := new([]string)
+			*sp = append(*sp, "/")
+			return sp
 		}
 
-		base := path.Base(*p)
+		base := path.Base(*p) + "/"
 		*p = path.Dir(*p)
 
 		l := MakeList(p)

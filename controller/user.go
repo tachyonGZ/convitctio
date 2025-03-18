@@ -1,10 +1,10 @@
 package controller
 
 import (
-	"conviction/db"
 	"conviction/model"
 	"conviction/serializer"
 	"fmt"
+	"strconv"
 
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
@@ -43,25 +43,42 @@ func UserLogin(c *gin.Context) {
 	session.Save()
 	fmt.Println("UserLogin: set session")
 
-	c.JSON(200, serializer.Response{})
+	// get user root dir
+	rootID, _ := model.GetUserRootID(u.ID)
+	rootIDRaw := strconv.FormatUint(uint64(rootID), 10)
+
+	// response
+	c.JSON(
+		200,
+		struct {
+			RootID string `json:"root_id"`
+		}{
+			RootID: rootIDRaw,
+		})
 }
 
 func UserRegister(c *gin.Context) {
 
-	// binding
+	// datga binding
 	var param struct {
 		Username string `json:"username"`
 		Password string `json:"password"`
 	}
 	if err := c.ShouldBindJSON(&param); err != nil {
-		c.JSON(200, serializer.Response{})
+		c.JSON(500, err.Error())
+		return
 	}
 
-	// create new user on db
-	u := model.NewUser()
-	u.Username = param.Username
-	u.Password = param.Password
-	db.GetDB().Create(&u)
+	// create user
+	user := model.User{
+		Username: param.Username,
+		Password: param.Password,
+	}
+	res := user.Create()
+	if res != nil {
+		c.String(500, res.Error())
+		return
+	}
 
 	c.JSON(200, serializer.Response{})
 }

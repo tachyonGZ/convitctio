@@ -18,3 +18,9 @@ func AuthRequired() gin.HandlerFunc {
 		c.Next()
 	}
 }
+
+func NoCache() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		c.Header("Cache-Control", "private, no-cache")
+	}
+}

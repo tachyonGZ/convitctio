@@ -15,3 +15,8 @@ type UploadCredential struct {
 	Policy      string   `json:"policy,omitempty"`
 	CompleteURL string   `json:"completeURL,omitempty"`
 }
+
+type DownloadCredential struct {
+	SessionID string `json:"sessionID"`
+	Expires   int64  `json:"expires"`
+}

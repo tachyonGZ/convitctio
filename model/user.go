@@ -24,10 +24,25 @@ func GetUserByUsername(username string) (User, error) {
 	return user, result.Error
 }
 
-func NewUser() User {
-	return User{}
-}
-
 func (user *User) CheckPassword(password string) bool {
 	return password == user.Password
+}
+
+func (user *User) Root() (*Directory, error) {
+	pRootDir := &Directory{}
+	res := db.GetDB().Where("parent_id is NULL AND owner_id = ?", user.ID).First(pRootDir)
+	return pRootDir, res.Error
+}
+
+func (user *User) Create() error {
+	res := db.GetDB().Create(user)
+	return res.Error
+}
+
+func (user *User) AfterCreate(tx *gorm.DB) error {
+	res := tx.Create(&Directory{
+		Name:    "/",
+		OwnerID: user.ID,
+	})
+	return res.Error
 }

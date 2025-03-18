@@ -6,14 +6,12 @@ import (
 	"conviction/model"
 	"conviction/serializer"
 	"conviction/util"
-	"encoding/json"
 	"net/http"
 	"net/url"
 	"os"
 	"strconv"
 	"time"
 
-	"github.com/coocood/freecache"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
@@ -45,7 +43,12 @@ func CreateUploadSession(c *gin.Context) {
 	}
 	fs := filesystem.NewFileSystem(u.(*model.User))
 
-	// create placeholder
+	// open directory
+	pDir, exist, _ := fs.OpenDirectory(param.Path)
+	if !exist {
+		pDir = fs.CreateDirectoryByPath(param.Path)
+	}
+
 	head := filesystem.FileHead{
 		MimeType:    param.MimeType,
 		Name:        param.Name,
@@ -53,8 +56,17 @@ func CreateUploadSession(c *gin.Context) {
 		VirtualPath: param.Path,
 	}
 
-	if !fs.CreatePlaceHolder(&head) {
-		c.String(500, "placeholder exists")
+	// check conflict
+	if fs.IsSameNameFileExists(head.Name, pDir) {
+		c.String(500, "filename conflict")
+		return
+	}
+
+	// create placeholder
+	pPlaceholder, err := fs.CreatePlaceHolder(&head, pDir)
+	if err != nil {
+		c.String(500, "create placeholder fail")
+		return
 	}
 
 	// store session in memocache
@@ -62,16 +74,18 @@ func CreateUploadSession(c *gin.Context) {
 	uuM, _ := uu.MarshalText()
 	key := string(uuM)
 	uploadSession := serializer.UploadSession{
+		FileID:         pPlaceholder.ID,
 		Key:            key,
 		UID:            fs.Owner.ID,
 		VirtualPath:    head.VirtualPath,
+		MimeType:       head.MimeType,
 		Name:           head.Name,
 		Size:           head.Size,
 		SavePath:       head.SavePath,
 		LastModified:   head.LastModified,
 		CallbackSecret: util.RandStringRunes(32),
 	}
-	memocache.SetJSON(append([]byte("callback_"), key...), uploadSession, ttl)
+	memocache.SetUploadSession(key, &uploadSession, ttl)
 
 	// get credential
 	credential := serializer.UploadCredential{
@@ -83,124 +97,174 @@ func CreateUploadSession(c *gin.Context) {
 }
 
 func UploadBySession(c *gin.Context) {
-	// binding
-	/*
-		var j struct {
-			ID string `uri:"session_id" binding:"required"`
-		}
-	*/
+	// data binding
 	var param struct {
-		ID string `json:"session_id" binding:"required"`
+		SessionID string `uri:"session_id" binding:"required"`
 	}
-	if err := c.ShouldBindJSON(&param); err != nil {
+	if err := c.ShouldBindUri(&param); err != nil {
 		c.JSON(500, err.Error())
+		return
 	}
-
-	// get upload session from cache
-	value, err := memocache.GetJSON([]byte("callback_" + param.ID))
-	if err != nil {
-		c.String(500, err.Error())
-	}
-	uploadSession := value.(serializer.UploadSession)
 
 	// create file system
 	u, _ := c.Get("user")
 	fs := filesystem.NewFileSystem(u.(*model.User))
 
-	/*
-		file := filesystem.FileStream{
-			File:        c.Request.Body,
-			MimeType:    c.Request.Header.Get("Content-Type"),
-			Name:        uploadSession.Name,
-			Size:        uploadSession.Size,
-			VirtualPath: uploadSession.VirtualPath,
-		}
-	*/
-
-	head := filesystem.FileHead{
-		MimeType:    c.Request.Header.Get("Content-Type"),
-		Name:        uploadSession.Name,
-		SavePath:    uploadSession.SavePath,
-		Size:        uploadSession.Size,
-		VirtualPath: uploadSession.VirtualPath,
+	// get upload session from cache
+	pSession, err := memocache.GetUploadSession(param.SessionID)
+	if err != nil {
+		c.String(500, err.Error())
+		return
 	}
 
-	fs.Upload(&head, c.Request.Body)
+	head := filesystem.FileHead{
+		MimeType:    pSession.MimeType,
+		Name:        pSession.Name,
+		SavePath:    pSession.SavePath,
+		Size:        pSession.Size,
+		VirtualPath: pSession.VirtualPath,
+	}
+
+	pPlaceholder, _ := model.GetFileByID(pSession.FileID, fs.Owner.ID)
+	fs.Upload(&head, c.Request.Body, pPlaceholder)
+
+	// delete upload session in cache
+	memocache.DeleteUploadSession(pSession.Key)
+
+	c.String(200, "")
 }
 
 func CreateDownloadSession(c *gin.Context) {
-	// create file system
+
+	ttl := 60
+
+	// data binding
+	var param struct {
+		FileID string `json:"file_id" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&param); err != nil {
+		c.JSON(500, err.Error())
+		return
+	}
+
+	// get current user
 	u, _ := c.Get("user")
-	fs := filesystem.NewFileSystem(u.(*model.User))
+	user := u.(*model.User)
 
-	// query object id from URL params
-	objectID, _ := strconv.ParseUint(c.Query("object_id"), 10, 32)
+	// create file system
+	fs := filesystem.NewFileSystem(user)
 
-	// get file by id
-	file := model.GetFileByID(uint(objectID))
+	fid, _ := strconv.ParseUint(param.FileID, 10, 32)
+	head := fs.GetFileHead(uint(fid))
 
-	// session
-	// store file model on cache
-	sessionID := util.RandStringRunes(16)
-	cache, _ := c.Get("cache")
-	b, _ := json.Marshal(file)
-	cache.(*freecache.Cache).Set([]byte("download_"+sessionID), b, 60)
+	// store session in cache
+	uu, _ := uuid.NewRandom()
+	uuM, _ := uu.MarshalText()
+	key := string(uuM)
+	session := serializer.DownloadSession{
+		FileID: uint(fid),
+		Key:    key,
+		Name:   head.Name,
+	}
+	memocache.SetDownloadSession(key, &session, ttl)
 
-	// get download address
-	downloadURL := fs.GetDownloadURL(uint(objectID), sessionID)
+	// get credential
+	credential := serializer.DownloadCredential{
+		SessionID: session.Key,
+		Expires:   time.Now().Add(time.Duration(ttl) * time.Second).Unix(),
+	}
 
-	c.JSON(0, downloadURL)
+	c.JSON(200, credential)
 }
 
 func DownloadBySession(c *gin.Context) {
 
-	// binding
-	var j struct {
-		ID string `uri:"id" binding:"required"`
+	// data binding
+	var param struct {
+		SessionID string `uri:"session_id" binding:"required"`
 	}
-	if err := c.ShouldBindJSON(&j); err != nil {
-		c.JSON(200, "")
+	if err := c.ShouldBindJSON(&param); err != nil {
+		c.JSON(500, err.Error())
+		return
 	}
 
 	// create file system
 	u, _ := c.Get("user")
 	fs := filesystem.NewFileSystem(u.(*model.User))
 
-	// session
-	// find file model on cache
-	cache, _ := c.Get("cache")
-	b, _ := cache.(*freecache.Cache).Get([]byte("download_" + j.ID))
-	var target model.File
-	json.Unmarshal(b, &target)
+	// get download session from cache
+	session, err := memocache.GetDownloadSession(param.SessionID)
+	if err != nil {
+		c.String(500, err.Error())
+		return
+	}
 
 	// prepare for download
-	rsc := fs.OpenFile(&target)
-	defer fs.CloseFile(rsc)
+	rsc := fs.Download(session.FileID)
+	defer rsc.Close()
 
 	// send file
-	c.Header("Content-Disposition", "attachment; filename=\""+url.PathEscape(target.Name)+"\"")
-	http.ServeContent(c.Writer, c.Request, target.Name, target.UpdatedAt, rsc)
+	c.Header(
+		"Content-Disposition",
+		"attachment; filename=\""+url.PathEscape(session.Name)+"\"")
+	http.ServeContent(c.Writer, c.Request, session.Name, time.Time{}, rsc)
+
+	c.String(200, "")
 }
 
 func Update(c *gin.Context) {
 
-	// create file system
 	u, _ := c.Get("user")
-	fs := filesystem.NewFileSystem(u.(*model.User))
+	user := u.(*model.User)
+
+	// create file system
+	fs := filesystem.NewFileSystem(user)
 
 	// query object id from URL params
 	objectID, _ := strconv.ParseUint(c.Query("object_id"), 10, 32)
 
 	// get target
-	target := model.GetFileByID(uint(objectID))
+	target, _ := model.GetFileByID(uint(objectID), user.ID)
 
 	f := filesystem.FileStream{}
 
-	fs.UpdateFile(&target, f)
+	fs.UpdateFile(target, f)
 }
 
-func Delete(c *gin.Context) {
-	// create file system
+func DeleteFile(c *gin.Context) {
+	// data binding
+	var param struct {
+		FileID string `json:"file_id" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&param); err != nil {
+		c.String(500, err.Error())
+		return
+	}
+
+	// get user
 	u, _ := c.Get("user")
-	fs := filesystem.NewFileSystem(u.(*model.User))
+	user := u.(*model.User)
+
+	// create file system
+	fs := filesystem.NewFileSystem(user)
+
+	// delete file
+	if err := fs.DeleteFile(param.FileID); err != nil {
+		c.String(500, err.Error())
+		return
+	}
+
+	// response
+	c.String(200, "")
+}
+
+func GetFileInfo(c *gin.Context) {
+	// data binding
+	var param struct {
+		FileID string `json:"file_id" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&param); err != nil {
+		c.String(500, err.Error())
+		return
+	}
 }

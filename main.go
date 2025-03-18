@@ -53,7 +53,12 @@ func InitRouter() *gin.Engine {
 
 	store := memstore.NewStore([]byte("secret"))
 	v1.Use(sessions.Sessions("convictio", store))
+
+	// user session
 	v1.Use(middleware.CurrentUser())
+
+	// disable cache
+	v1.Use(middleware.NoCache())
 
 	user := v1.Group("user")
 	{
@@ -67,20 +72,40 @@ func InitRouter() *gin.Engine {
 	{
 
 		file.PUT("upload", controller.CreateUploadSession)
-		file.POST("upload", controller.UploadBySession)
-		file.PUT("download", controller.CreateDownloadSession)
-		file.GET("download", controller.DownloadBySession)
-		file.DELETE("", controller.Delete)
+		file.POST("upload/:session_id", controller.UploadBySession)
+		file.POST("download/session", controller.CreateDownloadSession)
+		file.GET("download/:session_id", controller.DownloadBySession)
+
+		//file.POST("move", controller.Move)
+		//file.POST("copy", controller.Copy)
+
+		// delete a file
+		file.POST("delete", controller.DeleteFile)
+
+		// get info of file
+		file.POST("info", controller.GetFileInfo)
 	}
 
 	directory := auth.Group("directory")
 	{
 		// create a directory
-		directory.POST("", controller.CreateDirectory)
+		directory.POST("create", controller.CreateDirectory)
 
-		// list all contents of a directory
-		directory.GET("", controller.ListDirectory)
+		// delete a directory
+		directory.POST("delete", controller.DeleteDirectory)
+
+		// get info of directory
+		directory.POST("info", controller.GetDirectoryInfo)
+
+		// read content of directory
+		directory.POST("read", controller.ReadDirectory)
+
 	}
 
+	share := auth.Group("share")
+	{
+		share.POST("create", controller.CreateShare)
+		share.POST("delete", controller.DeleteShare)
+	}
 	return r
 }

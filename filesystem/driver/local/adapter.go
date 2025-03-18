@@ -40,7 +40,7 @@ func (fsa FileSystemAdapter) Put(srcFile io.ReadCloser, dst string, size uint64)
 	return err
 }
 
-func (fsa FileSystemAdapter) Delete(filePath []string) ([]string, error) {
+func (fsa FileSystemAdapter) DeleteG(filePath []string) ([]string, error) {
 
 	failedPath := make([]string, 0, len(filePath))
 	var retErr error
@@ -54,6 +54,10 @@ func (fsa FileSystemAdapter) Delete(filePath []string) ([]string, error) {
 	}
 
 	return failedPath, retErr
+}
+
+func (fsa FileSystemAdapter) Delete(filePath string) error {
+	return os.Remove(util.RelativePath(filepath.FromSlash(filePath)))
 }
 
 func (fsa FileSystemAdapter) Get(filePath string) (util.ReadSeekCloser, error) {
