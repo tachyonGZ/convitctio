@@ -41,6 +41,21 @@ func NewFileSystem(Owner *model.User) *FileSystem {
 	return fs
 }
 
+func NewFileSystem2(owner_id string) (fs *FileSystem, err error) {
+	fs = GetFileSystem()
+
+	pOwner, e := model.FindUser(owner_id)
+	if e != nil {
+		err = e
+		return
+	}
+	fs.Owner = *pOwner
+
+	fs.DispatchAdapter()
+
+	return
+}
+
 func (fs *FileSystem) GrenateSavePath(fmd *FileHead) string {
 	strUserID := strconv.FormatUint(uint64(fs.Owner.Model.ID), 10)
 	strPath := fmd.VirtualPath
@@ -60,8 +75,8 @@ func (fs *FileSystem) Upload(head *FileHead, body IFileBody, pPlaceHolder *model
 	pPlaceHolder.PlaceholderToFile()
 }
 
-func (fs *FileSystem) Download(fileID uint) (rsc util.ReadSeekCloser) {
-	file, _ := model.GetFileByID(fileID, fs.Owner.ID)
+func (fs *FileSystem) Download(file_id string) (rsc util.ReadSeekCloser) {
+	file, _ := model.FindUserFile2(fs.Owner.UUID, file_id)
 	rsc, _ = fs.Adapter.Get(file.Path)
 	return
 }

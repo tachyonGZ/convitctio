@@ -104,8 +104,8 @@ func InitRouter() *gin.Engine {
 
 	share := auth.Group("share")
 	{
-		share.POST("create", controller.CreateShare)
-		share.POST("delete", controller.DeleteShare)
+		share.POST("createf", controller.CreateSharedFile)
+		share.POST("delete", controller.DeleteSharedFile)
 	}
 	return r
 }

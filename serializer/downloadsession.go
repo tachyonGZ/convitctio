@@ -1,7 +1,9 @@
 package serializer
 
 type DownloadSession struct {
-	FileID uint   // ID of dest file
-	Key    string // UUID
-	Name   string // 文件名
+	Key string // session key
+
+	FileID  string // ID of dest file
+	Name    string // 文件名
+	OwnerID string
 }

@@ -4,14 +4,26 @@ import (
 	"conviction/db"
 	"errors"
 
+	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
 type Directory struct {
 	gorm.Model
+	DirectoryUUID string
+
 	Name     string `gorm:"unique_index:idx_only_one_name"`
 	OwnerID  uint   `gorm:"index:owner_id"`
 	ParentID *uint  `gorm:"index:parent_id;unique_index:idx_only_one_name"`
+}
+
+func (pDir *Directory) BeforeCreate(tx *gorm.DB) (err error) {
+	uuid, err := uuid.NewV7()
+	if err != nil {
+		err = errors.New("uuid grenate failed")
+	}
+	pDir.DirectoryUUID = "dir_" + uuid.String()
+	return
 }
 
 func (d *Directory) BeforeDelete(tx *gorm.DB) (err error) {
@@ -46,9 +58,8 @@ func (d *Directory) GetChild(dirName string) (*Directory, bool, error) {
 	return pChildDir, res.RowsAffected != 0, res.Error
 }
 
-// insert directory into DB table
-func (d *Directory) Create() error {
-	res := db.GetDB().Create(d)
+func (pDir *Directory) Create() error {
+	res := db.GetDB().Create(pDir)
 	return res.Error
 }
 

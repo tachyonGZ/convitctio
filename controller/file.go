@@ -6,8 +6,6 @@ import (
 	"conviction/model"
 	"conviction/serializer"
 	"conviction/util"
-	"net/http"
-	"net/url"
 	"os"
 	"strconv"
 	"time"
@@ -162,9 +160,11 @@ func CreateDownloadSession(c *gin.Context) {
 	uuM, _ := uu.MarshalText()
 	key := string(uuM)
 	session := serializer.DownloadSession{
-		FileID: uint(fid),
-		Key:    key,
-		Name:   head.Name,
+		Key: key,
+
+		FileID:  param.FileID,
+		Name:    head.Name,
+		OwnerID: fs.Owner.UserUUID,
 	}
 	memocache.SetDownloadSession(key, &session, ttl)
 
@@ -175,41 +175,6 @@ func CreateDownloadSession(c *gin.Context) {
 	}
 
 	c.JSON(200, credential)
-}
-
-func DownloadBySession(c *gin.Context) {
-
-	// data binding
-	var param struct {
-		SessionID string `uri:"session_id" binding:"required"`
-	}
-	if err := c.ShouldBindJSON(&param); err != nil {
-		c.JSON(500, err.Error())
-		return
-	}
-
-	// create file system
-	u, _ := c.Get("user")
-	fs := filesystem.NewFileSystem(u.(*model.User))
-
-	// get download session from cache
-	session, err := memocache.GetDownloadSession(param.SessionID)
-	if err != nil {
-		c.String(500, err.Error())
-		return
-	}
-
-	// prepare for download
-	rsc := fs.Download(session.FileID)
-	defer rsc.Close()
-
-	// send file
-	c.Header(
-		"Content-Disposition",
-		"attachment; filename=\""+url.PathEscape(session.Name)+"\"")
-	http.ServeContent(c.Writer, c.Request, session.Name, time.Time{}, rsc)
-
-	c.String(200, "")
 }
 
 func Update(c *gin.Context) {
