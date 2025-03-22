@@ -3,7 +3,6 @@ package controller
 import (
 	"conviction/filesystem"
 	"conviction/memocache"
-	"conviction/model"
 	"net/http"
 	"net/url"
 	"time"
@@ -11,7 +10,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func DownloadBySession(c *gin.Context) {
+func Download(c *gin.Context) {
 
 	// data binding
 	var param struct {
@@ -22,9 +21,9 @@ func DownloadBySession(c *gin.Context) {
 		return
 	}
 
-	// create file system
-	u, _ := c.Get("user")
-	fs := filesystem.NewFileSystem(u.(*model.User))
+	// create global file system
+	user_id, _ := c.Get("user_id")
+	fs := filesystem.NewGlobalFileSystem(user_id.(string))
 
 	// get download session from cache
 	session, err := memocache.GetDownloadSession(param.SessionID)
@@ -34,7 +33,7 @@ func DownloadBySession(c *gin.Context) {
 	}
 
 	// prepare for download
-	rsc := fs.Download(session.FileID)
+	rsc := fs.Download(session.OwnerID, session.FileID)
 	defer rsc.Close()
 
 	// send file

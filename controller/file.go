@@ -41,10 +41,10 @@ func CreateUploadSession(c *gin.Context) {
 	}
 	fs := filesystem.NewFileSystem(u.(*model.User))
 
-	// open directory
-	pDir, exist, _ := fs.OpenDirectory(param.Path)
+	// open or create directory
+	dir_id, exist, _ := fs.OpenDirectory(param.Path)
 	if !exist {
-		pDir = fs.CreateDirectoryByPath(param.Path)
+		dir_id = fs.CreateDirectoryByPath(param.Path)
 	}
 
 	head := filesystem.FileHead{
@@ -54,16 +54,10 @@ func CreateUploadSession(c *gin.Context) {
 		VirtualPath: param.Path,
 	}
 
-	// check conflict
-	if fs.IsSameNameFileExists(head.Name, pDir) {
-		c.String(500, "filename conflict")
-		return
-	}
-
 	// create placeholder
-	pPlaceholder, err := fs.CreatePlaceHolder(&head, pDir)
+	holder_id, err := fs.CreatePlaceHolder(&head, dir_id)
 	if err != nil {
-		c.String(500, "create placeholder fail")
+		c.String(500, "create placeholder fail"+err.Error())
 		return
 	}
 
@@ -72,9 +66,10 @@ func CreateUploadSession(c *gin.Context) {
 	uuM, _ := uu.MarshalText()
 	key := string(uuM)
 	uploadSession := serializer.UploadSession{
-		FileID:         pPlaceholder.ID,
-		Key:            key,
-		UID:            fs.Owner.ID,
+		Key: key,
+
+		PlaceholderID:  holder_id,
+		OwnerID:        fs.Owner.UUID,
 		VirtualPath:    head.VirtualPath,
 		MimeType:       head.MimeType,
 		Name:           head.Name,
@@ -123,8 +118,7 @@ func UploadBySession(c *gin.Context) {
 		VirtualPath: pSession.VirtualPath,
 	}
 
-	pPlaceholder, _ := model.GetFileByID(pSession.FileID, fs.Owner.ID)
-	fs.Upload(&head, c.Request.Body, pPlaceholder)
+	fs.Upload(&head, c.Request.Body, pSession.PlaceholderID)
 
 	// delete upload session in cache
 	memocache.DeleteUploadSession(pSession.Key)
@@ -164,7 +158,7 @@ func CreateDownloadSession(c *gin.Context) {
 
 		FileID:  param.FileID,
 		Name:    head.Name,
-		OwnerID: fs.Owner.UserUUID,
+		OwnerID: fs.Owner.UUID,
 	}
 	memocache.SetDownloadSession(key, &session, ttl)
 

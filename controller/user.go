@@ -3,8 +3,6 @@ package controller
 import (
 	"conviction/model"
 	"conviction/serializer"
-	"fmt"
-	"strconv"
 
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
@@ -21,31 +19,27 @@ func UserLogin(c *gin.Context) {
 		c.JSON(200, serializer.Response{})
 	}
 
-	u, err := model.GetUserByUsername(param.Username)
+	user, err := model.FindUserByUsername(param.Username)
 
 	// auth username
 	if nil != err {
 		c.String(200, "Wrong password or email address")
-		fmt.Println("Wrong password or email address")
 		return
 	}
 
 	// auth password
-	if authOK := u.CheckPassword(param.Password); !authOK {
+	if authOK := user.CheckPassword(param.Password); !authOK {
 		c.String(200, "Wrong password or email address")
-		fmt.Println("Wrong password or email address")
 		return
 	}
 
 	// session
 	session := sessions.Default(c)
-	session.Set("user_id", u.ID)
+	session.Set("user_id", user.UUID)
 	session.Save()
-	fmt.Println("UserLogin: set session")
 
 	// get user root dir
-	rootID, _ := model.GetUserRootID(u.ID)
-	rootIDRaw := strconv.FormatUint(uint64(rootID), 10)
+	rootID, _ := model.GetUserRootID(user.UUID)
 
 	// response
 	c.JSON(
@@ -53,7 +47,7 @@ func UserLogin(c *gin.Context) {
 		struct {
 			RootID string `json:"root_id"`
 		}{
-			RootID: rootIDRaw,
+			RootID: rootID,
 		})
 }
 

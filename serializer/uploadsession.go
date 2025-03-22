@@ -3,9 +3,10 @@ package serializer
 import "time"
 
 type UploadSession struct {
-	FileID         uint   // ID of dest file
-	Key            string // UUID
-	UID            uint   // owner
+	Key string // session key
+
+	PlaceholderID  string // file id
+	OwnerID        string // user id
 	VirtualPath    string // 用户文件路径，不含文件名
 	MimeType       string
 	Name           string     // 文件名

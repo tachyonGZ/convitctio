@@ -66,6 +66,11 @@ func InitRouter() *gin.Engine {
 		user.POST("", controller.UserRegister)
 	}
 
+	download := v1.Group("download")
+	{
+		download.GET(":session_id", controller.Download)
+	}
+
 	auth := v1.Group("")
 	auth.Use(middleware.AuthRequired())
 	file := auth.Group("file")
@@ -74,7 +79,6 @@ func InitRouter() *gin.Engine {
 		file.PUT("upload", controller.CreateUploadSession)
 		file.POST("upload/:session_id", controller.UploadBySession)
 		file.POST("download/session", controller.CreateDownloadSession)
-		file.GET("download/:session_id", controller.DownloadBySession)
 
 		//file.POST("move", controller.Move)
 		//file.POST("copy", controller.Copy)

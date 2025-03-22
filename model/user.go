@@ -31,13 +31,7 @@ func FindUser(user_uuid string) (*User, error) {
 	return &user, res.Error
 }
 
-func GetUserByID(ID any) (User, error) {
-	var user User
-	result := db.GetDB().First(&user, ID)
-	return user, result.Error
-}
-
-func GetUserByUsername(username string) (User, error) {
+func FindUserByUsername(username string) (User, error) {
 	var user User
 	result := db.GetDB().Where("username = ?", username).First(&user)
 	return user, result.Error
@@ -60,8 +54,8 @@ func (pUser *User) Create() error {
 
 func (user *User) AfterCreate(tx *gorm.DB) error {
 	res := tx.Create(&Directory{
-		Name:    "/",
-		OwnerID: user.ID,
+		Name:      "/",
+		OwnerUUID: user.UUID,
 	})
 	return res.Error
 }

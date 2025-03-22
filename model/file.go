@@ -12,12 +12,15 @@ type File struct {
 	gorm.Model
 	UUID string `gorm:"column:uuid"`
 
-	UserID      uint   `gorm:"index:user_id;unique_index:idx_only_one"`
-	OwnerUUID   string `gorm:"column:owner_uuid"`
-	Name        string `gorm:"unique_index:idx_only_one"`
-	Path        string `gorm:"type:text"`
-	Size        uint64
-	DirectoryID uint `gorm:"index:directory_id;unique_index:idx_only_one"`
+	DirectoryUUID string `gorm:"column:directory_uuid"`
+	OwnerUUID     string `gorm:"column:owner_uuid"`
+
+	Name string `gorm:"unique_index:idx_only_one"`
+	Path string `gorm:"type:text"`
+	Size uint64
+
+	//UserID uint   `gorm:"index:user_id;unique_index:idx_only_one"`
+	//DirectoryID uint `gorm:"index:directory_id;unique_index:idx_only_one"`
 }
 
 func (pFile *File) BeforeCreate(tx *gorm.DB) (err error) {
@@ -29,9 +32,11 @@ func (pFile *File) BeforeCreate(tx *gorm.DB) (err error) {
 	return
 }
 
-func IsSameNameFileExist(name string, dirID uint, userID uint) bool {
+func IsSameNameFileExist(owner_uuid string, dir_uuid string, name string) bool {
 	file := &File{}
-	res := db.GetDB().Where("name = ? AND directory_id = ? AND user_id = ?", name, dirID, userID).Find(file)
+	res := db.GetDB().
+		Where("name = ? AND directory_uuid = ? AND owner_uuid = ?", name, dir_uuid, owner_uuid).
+		Find(file)
 	return res.RowsAffected != 0
 }
 
@@ -56,13 +61,7 @@ func GetFileByID(fileID uint, userID uint) (*File, error) {
 	return &f, res.Error
 }
 
-func FindUserFile(userID uint, fileID string) (*File, error) {
-	file := File{}
-	res := db.GetDB().Where("user_id = ? AND id = ?", userID, fileID).Find(&file)
-	return &file, res.Error
-}
-
-func FindUserFile2(owner_uuid string, file_uuid string) (*File, error) {
+func FindUserFile(owner_uuid string, file_uuid string) (*File, error) {
 	file := File{}
 	res := db.GetDB().Where("owner_uuid = ? AND uuid = ?", owner_uuid, file_uuid).Find(&file)
 	return &file, res.Error
@@ -74,6 +73,6 @@ func IsUserOwnFile(userID string, fileID string) (bool, error) {
 	return res.RowsAffected != 0, res.Error
 }
 
-func (file *File) PlaceholderToFile() {
-
+func (file *File) PlaceholderToFile() (err error) {
+	return
 }

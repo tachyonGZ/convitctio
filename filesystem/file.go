@@ -8,7 +8,7 @@ import (
 func (fs *FileSystem) DeleteFile(fileID string) (err error) {
 
 	// get path of file to delete
-	file, err := model.FindUserFile(fs.Owner.ID, fileID)
+	file, err := model.FindUserFile(fs.Owner.UUID, fileID)
 	if err != nil {
 		return
 	}
@@ -28,7 +28,7 @@ func (fs *FileSystem) DeleteFile(fileID string) (err error) {
 func (fs *FileSystem) CreateSharedFile(sourceID string) (sharedFileID string, err error) {
 
 	// check is file exist
-	exist, e := model.IsUserOwnFile(fs.Owner.UserUUID, sourceID)
+	exist, e := model.IsUserOwnFile(fs.Owner.UUID, sourceID)
 	if e != nil {
 		err = errors.New("find file fail")
 		return
@@ -40,7 +40,7 @@ func (fs *FileSystem) CreateSharedFile(sourceID string) (sharedFileID string, er
 
 	// create shared file
 	newSharedFile := model.SharedFile{
-		CreatorID: fs.Owner.UserUUID,
+		CreatorID: fs.Owner.UUID,
 		SourceID:  sourceID,
 	}
 	if e = newSharedFile.Create(); e != nil {

@@ -10,11 +10,12 @@ import (
 
 type Directory struct {
 	gorm.Model
-	DirectoryUUID string
+	UUID string `gorm:"column:uuid"`
 
-	Name     string `gorm:"unique_index:idx_only_one_name"`
-	OwnerID  uint   `gorm:"index:owner_id"`
-	ParentID *uint  `gorm:"index:parent_id;unique_index:idx_only_one_name"`
+	OwnerUUID  string  `gorm:"column:owner_uuid;index:owner_uuid"`
+	ParentUUID *string `gorm:"column:parent_uuid;index:parent_id;unique_index:idx_only_one_name"`
+
+	Name string `gorm:"unique_index:idx_only_one_name"`
 }
 
 func (pDir *Directory) BeforeCreate(tx *gorm.DB) (err error) {
@@ -22,7 +23,7 @@ func (pDir *Directory) BeforeCreate(tx *gorm.DB) (err error) {
 	if err != nil {
 		err = errors.New("uuid grenate failed")
 	}
-	pDir.DirectoryUUID = "dir_" + uuid.String()
+	pDir.UUID = "dir_" + uuid.String()
 	return
 }
 
@@ -53,7 +54,7 @@ func (d *Directory) BeforeDelete(tx *gorm.DB) (err error) {
 func (d *Directory) GetChild(dirName string) (*Directory, bool, error) {
 	pChildDir := &Directory{}
 	res := db.GetDB().
-		Where("parent_id = ? AND owner_id = ? AND name = ?", d.ID, d.OwnerID, dirName).
+		Where("parent_uuid = ? AND owner_uuid = ? AND name = ?", d.ID, d.OwnerUUID, dirName).
 		Find(pChildDir)
 	return pChildDir, res.RowsAffected != 0, res.Error
 }
@@ -64,30 +65,37 @@ func (pDir *Directory) Create() error {
 }
 
 func (d *Directory) GetChildDirectory() (childDir []Directory, err error) {
-	res := db.GetDB().Where("parent_id = ?", d.ID).Find(&childDir)
+	res := db.GetDB().Where("parent_uuid = ?", d.UUID).Find(&childDir)
 	err = res.Error
 	return
 }
 
 func (d *Directory) GetChildFile() (childFile []File, err error) {
-	res := db.GetDB().Where("directory_id = ?", d.ID).Find(&childFile)
+	res := db.GetDB().Where("directory_uuid = ?", d.UUID).Find(&childFile)
 	err = res.Error
 	return
 }
 
-func GetUserDirectory(userID uint, dirID uint) (*Directory, error) {
+func FindUserDirectory(user_uuid string, dir_uuid string) (*Directory, error) {
 	dir := Directory{}
-	res := db.GetDB().Where("owner_id = ? AND id = ?", userID, dirID).Find(&dir)
+	res := db.GetDB().
+		Where("owner_uuid = ? AND uuid = ?", user_uuid, dir_uuid).
+		Find(&dir)
 	return &dir, res.Error
 }
 
-func DeleteUserDirectory(userID uint, dirID string) error {
-	res := db.GetDB().Unscoped().Where("owner_id = ? AND id = ?", userID, dirID).Delete(&Directory{})
+func DeleteUserDirectory(user_uuid string, dir_uuid string) error {
+	res := db.GetDB().
+		Unscoped().
+		Where("owner_uuid = ? AND uuid = ?", user_uuid, dir_uuid).
+		Delete(&Directory{})
 	return res.Error
 }
 
-func GetUserRootID(userID uint) (uint, error) {
-	rootDir := Directory{}
-	res := db.GetDB().Where("parent_id is NULL AND owner_id = ?", userID).First(&rootDir)
-	return rootDir.ID, res.Error
+func GetUserRootID(user_uuid string) (string, error) {
+	root_dir := Directory{}
+	res := db.GetDB().
+		Where("owner_uuid = ? AND parent_uuid is NULL", user_uuid).
+		Find(&root_dir)
+	return root_dir.UUID, res.Error
 }
