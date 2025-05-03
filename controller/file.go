@@ -7,7 +7,6 @@ import (
 	"conviction/serializer"
 	"conviction/util"
 	"os"
-	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -34,17 +33,21 @@ func CreateUploadSession(c *gin.Context) {
 	}
 
 	// create file system
-	u, exists := c.Get("user")
-	if !exists {
-		c.String(500, "current user not exists")
-		return
-	}
-	fs := filesystem.NewFileSystem(u.(*model.User))
+	user_id, _ := c.Get("user_id")
+	fs, _ := filesystem.NewFileSystem(user_id.(string))
 
 	// open or create directory
-	dir_id, exist, _ := fs.OpenDirectory(param.Path)
+	dir_id, exist, e := fs.OpenDirectory(param.Path)
+	if e != nil {
+		c.String(500, e.Error())
+		return
+	}
 	if !exist {
-		dir_id = fs.CreateDirectoryByPath(param.Path)
+		dir_id, e = fs.CreateDirectoryByPath(param.Path)
+		if e != nil {
+			c.String(500, e.Error())
+			return
+		}
 	}
 
 	head := filesystem.FileHead{
@@ -89,43 +92,6 @@ func CreateUploadSession(c *gin.Context) {
 	c.JSON(200, credential)
 }
 
-func UploadBySession(c *gin.Context) {
-	// data binding
-	var param struct {
-		SessionID string `uri:"session_id" binding:"required"`
-	}
-	if err := c.ShouldBindUri(&param); err != nil {
-		c.JSON(500, err.Error())
-		return
-	}
-
-	// create file system
-	u, _ := c.Get("user")
-	fs := filesystem.NewFileSystem(u.(*model.User))
-
-	// get upload session from cache
-	pSession, err := memocache.GetUploadSession(param.SessionID)
-	if err != nil {
-		c.String(500, err.Error())
-		return
-	}
-
-	head := filesystem.FileHead{
-		MimeType:    pSession.MimeType,
-		Name:        pSession.Name,
-		SavePath:    pSession.SavePath,
-		Size:        pSession.Size,
-		VirtualPath: pSession.VirtualPath,
-	}
-
-	fs.Upload(&head, c.Request.Body, pSession.PlaceholderID)
-
-	// delete upload session in cache
-	memocache.DeleteUploadSession(pSession.Key)
-
-	c.String(200, "")
-}
-
 func CreateDownloadSession(c *gin.Context) {
 
 	ttl := 60
@@ -139,16 +105,6 @@ func CreateDownloadSession(c *gin.Context) {
 		return
 	}
 
-	// get current user
-	u, _ := c.Get("user")
-	user := u.(*model.User)
-
-	// create file system
-	fs := filesystem.NewFileSystem(user)
-
-	fid, _ := strconv.ParseUint(param.FileID, 10, 32)
-	head := fs.GetFileHead(uint(fid))
-
 	// store session in cache
 	uu, _ := uuid.NewRandom()
 	uuM, _ := uu.MarshalText()
@@ -156,9 +112,8 @@ func CreateDownloadSession(c *gin.Context) {
 	session := serializer.DownloadSession{
 		Key: key,
 
-		FileID:  param.FileID,
-		Name:    head.Name,
-		OwnerID: fs.Owner.UUID,
+		DestType: serializer.PersonalFile,
+		DestID:   param.FileID,
 	}
 	memocache.SetDownloadSession(key, &session, ttl)
 
@@ -173,17 +128,15 @@ func CreateDownloadSession(c *gin.Context) {
 
 func Update(c *gin.Context) {
 
-	u, _ := c.Get("user")
-	user := u.(*model.User)
-
 	// create file system
-	fs := filesystem.NewFileSystem(user)
+	user_id, _ := c.Get("user_id")
+	fs, _ := filesystem.NewFileSystem(user_id.(string))
 
 	// query object id from URL params
-	objectID, _ := strconv.ParseUint(c.Query("object_id"), 10, 32)
+	object_id := c.Query("object_id")
 
 	// get target
-	target, _ := model.GetFileByID(uint(objectID), user.ID)
+	target, _ := model.FindUserFile(user_id.(string), object_id)
 
 	f := filesystem.FileStream{}
 
@@ -200,12 +153,9 @@ func DeleteFile(c *gin.Context) {
 		return
 	}
 
-	// get user
-	u, _ := c.Get("user")
-	user := u.(*model.User)
-
 	// create file system
-	fs := filesystem.NewFileSystem(user)
+	user_id, _ := c.Get("user_id")
+	fs, _ := filesystem.NewFileSystem(user_id.(string))
 
 	// delete file
 	if err := fs.DeleteFile(param.FileID); err != nil {
@@ -217,7 +167,7 @@ func DeleteFile(c *gin.Context) {
 	c.String(200, "")
 }
 
-func GetFileInfo(c *gin.Context) {
+func GetFileStatus(c *gin.Context) {
 	// data binding
 	var param struct {
 		FileID string `json:"file_id" binding:"required"`
@@ -226,4 +176,54 @@ func GetFileInfo(c *gin.Context) {
 		c.String(500, err.Error())
 		return
 	}
+
+	// create file system
+	user_id, _ := c.Get("user_id")
+	fs, _ := filesystem.NewFileSystem(user_id.(string))
+
+	p_head, e := fs.GetFileHead(param.FileID)
+	if e != nil {
+		c.String(500, e.Error())
+		return
+	}
+
+	// response
+	c.JSON(
+		200,
+		struct {
+			Name     string `json:"name"`
+			MimeType string `json:"mime_type"`
+			Size     uint64 `json:"size"`
+		}{
+			Name:     p_head.Name,
+			MimeType: p_head.MimeType,
+			Size:     p_head.Size,
+		})
+}
+
+func MoveFile(c *gin.Context) {
+}
+
+func RenameFile(c *gin.Context) {
+	// data binding
+	var param struct {
+		FileID string `json:"file_id" binding:"required"`
+		Name   string `json:"name" binding:"required"`
+	}
+	if e := c.ShouldBindJSON(&param); e != nil {
+		c.String(500, e.Error())
+		return
+	}
+
+	// create file system
+	user_id, _ := c.Get("user_id")
+	fs, _ := filesystem.NewFileSystem(user_id.(string))
+
+	e := fs.RenameFile(param.FileID, param.Name)
+	if e != nil {
+		c.String(500, e.Error())
+		return
+	}
+
+	c.String(200, "")
 }

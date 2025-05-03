@@ -41,12 +41,6 @@ func (user *User) CheckPassword(password string) bool {
 	return password == user.Password
 }
 
-func (user *User) Root() (*Directory, error) {
-	pRootDir := &Directory{}
-	res := db.GetDB().Where("parent_id is NULL AND owner_id = ?", user.ID).First(pRootDir)
-	return pRootDir, res.Error
-}
-
 func (pUser *User) Create() error {
 	res := db.GetDB().Create(pUser)
 	return res.Error
@@ -58,4 +52,10 @@ func (user *User) AfterCreate(tx *gorm.DB) error {
 		OwnerUUID: user.UUID,
 	})
 	return res.Error
+}
+
+func (user *User) Root() (*Directory, error) {
+	pRootDir := &Directory{}
+	res := db.GetDB().Where("parent_uuid is NULL AND owner_uuid = ?", user.UUID).First(pRootDir)
+	return pRootDir, res.Error
 }

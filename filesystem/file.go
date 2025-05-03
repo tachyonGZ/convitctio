@@ -40,8 +40,8 @@ func (fs *FileSystem) CreateSharedFile(sourceID string) (sharedFileID string, er
 
 	// create shared file
 	newSharedFile := model.SharedFile{
-		CreatorID: fs.Owner.UUID,
-		SourceID:  sourceID,
+		CreatorUUID: fs.Owner.UUID,
+		SourceUUID:  sourceID,
 	}
 	if e = newSharedFile.Create(); e != nil {
 		err = errors.New("create shared file fail")
@@ -55,5 +55,10 @@ func (fs *FileSystem) CreateSharedFile(sourceID string) (sharedFileID string, er
 func (fs *FileSystem) DeleteSharedFile(sharedFileID string) (err error) {
 
 	// delete shared file
+	return
+}
+
+func (fs *FileSystem) GetSharedFile(shared_file_id string) (file_id string, err error) {
+
 	return
 }

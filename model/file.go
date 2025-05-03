@@ -50,15 +50,17 @@ func (file *File) Delete() error {
 	return res.Error
 }
 
-func DeleteUserFile(userID uint, fileID string) error {
-	res := db.GetDB().Unscoped().Where("user_id = ? AND id = ?", userID, fileID).Delete(&File{})
+func (file *File) Rename(name string) error {
+	res := db.GetDB().
+		Model(file).
+		Select("name").
+		Updates(file)
 	return res.Error
 }
 
-func GetFileByID(fileID uint, userID uint) (*File, error) {
-	f := File{}
-	res := db.GetDB().Where("id = ? AND user_id = ?", fileID, userID).First(&f)
-	return &f, res.Error
+func DeleteUserFile(userID uint, fileID string) error {
+	res := db.GetDB().Unscoped().Where("user_id = ? AND id = ?", userID, fileID).Delete(&File{})
+	return res.Error
 }
 
 func FindUserFile(owner_uuid string, file_uuid string) (*File, error) {

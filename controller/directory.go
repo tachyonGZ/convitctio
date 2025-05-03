@@ -2,15 +2,14 @@ package controller
 
 import (
 	"conviction/filesystem"
-	"conviction/model"
 
 	"github.com/gin-gonic/gin"
 )
 
 func CreateDirectory(c *gin.Context) {
 	// create file system
-	u, _ := c.Get("user")
-	fs := filesystem.NewFileSystem(u.(*model.User))
+	user_id, _ := c.Get("user_id")
+	fs, _ := filesystem.NewFileSystem(user_id.(string))
 
 	// binding
 	var param struct {
@@ -45,8 +44,8 @@ func DeleteDirectory(c *gin.Context) {
 	}
 
 	// create file system
-	u, _ := c.Get("user")
-	fs := filesystem.NewFileSystem(u.(*model.User))
+	user_id, _ := c.Get("user_id")
+	fs, _ := filesystem.NewFileSystem(user_id.(string))
 
 	// delete directory
 	if err := fs.DeleteDirectory(param.DirectoryID); err != nil {
@@ -69,8 +68,8 @@ func GetDirectoryInfo(c *gin.Context) {
 	}
 
 	// create file system
-	u, _ := c.Get("user")
-	fs := filesystem.NewFileSystem(u.(*model.User))
+	user_id, _ := c.Get("user_id")
+	fs, _ := filesystem.NewFileSystem(user_id.(string))
 
 	// get directory info
 	dirHead := fs.GetDirectoryHead(param.DirectoryID)
@@ -88,8 +87,8 @@ func GetDirectoryInfo(c *gin.Context) {
 
 func ReadDirectory(c *gin.Context) {
 	// create file system
-	u, _ := c.Get("user")
-	fs := filesystem.NewFileSystem(u.(*model.User))
+	user_id, _ := c.Get("user_id")
+	fs, _ := filesystem.NewFileSystem(user_id.(string))
 
 	//var param struct {
 	//	Path string `uri:"path" json:"path" binding:"required,min=1,max=65535"`

@@ -62,54 +62,59 @@ func InitRouter() *gin.Engine {
 
 	user := v1.Group("user")
 	{
-		user.POST("session", controller.UserLogin)
-		user.POST("", controller.UserRegister)
-	}
-
-	download := v1.Group("download")
-	{
-		download.GET(":session_id", controller.Download)
+		user.POST("login", controller.UserLogin)
+		user.POST("register", controller.UserRegister)
 	}
 
 	auth := v1.Group("")
 	auth.Use(middleware.AuthRequired())
-	file := auth.Group("file")
 	{
+		file := auth.Group("file")
+		{
 
-		file.PUT("upload", controller.CreateUploadSession)
-		file.POST("upload/:session_id", controller.UploadBySession)
-		file.POST("download/session", controller.CreateDownloadSession)
+			file.POST("upload/session", controller.CreateUploadSession)
+			file.POST("download/session", controller.CreateDownloadSession)
 
-		//file.POST("move", controller.Move)
-		//file.POST("copy", controller.Copy)
+			// delete a file
+			file.POST("delete", controller.DeleteFile)
 
-		// delete a file
-		file.POST("delete", controller.DeleteFile)
+			// get info of file
+			file.POST("info", controller.GetFileStatus)
 
-		// get info of file
-		file.POST("info", controller.GetFileInfo)
-	}
+			// move a file
+			file.POST("move", controller.MoveFile)
 
-	directory := auth.Group("directory")
-	{
-		// create a directory
-		directory.POST("create", controller.CreateDirectory)
+			// rename a file
+			file.POST("rename", controller.RenameFile)
+		}
 
-		// delete a directory
-		directory.POST("delete", controller.DeleteDirectory)
+		session := auth.Group("session")
+		{
+			session.GET("download/:session_id", controller.Download)
+			session.POST("upload/:session_id", controller.Upload)
+		}
 
-		// get info of directory
-		directory.POST("info", controller.GetDirectoryInfo)
+		directory := auth.Group("directory")
+		{
+			// create a directory
+			directory.POST("create", controller.CreateDirectory)
 
-		// read content of directory
-		directory.POST("read", controller.ReadDirectory)
+			// delete a directory
+			directory.POST("delete", controller.DeleteDirectory)
 
-	}
+			// get info of directory
+			directory.POST("info", controller.GetDirectoryInfo)
 
-	share := auth.Group("share")
-	{
-		share.POST("createf", controller.CreateSharedFile)
-		share.POST("delete", controller.DeleteSharedFile)
+			// read content of directory
+			directory.POST("read", controller.ReadDirectory)
+
+		}
+
+		share := auth.Group("share")
+		{
+			share.POST("create", controller.CreateSharedFile)
+			share.POST("delete", controller.DeleteSharedFile)
+		}
 	}
 	return r
 }

@@ -12,8 +12,8 @@ type SharedFile struct {
 	gorm.Model
 	UUID string `gorm:"column:uuid"`
 
-	CreatorID string `gorm:"column:creator_uuid"` // user id
-	SourceID  string `gorm:"column:source_uuid"`  // file id
+	CreatorUUID string `gorm:"column:creator_uuid"` // user id
+	SourceUUID  string `gorm:"column:source_uuid"`  // file id
 }
 
 func (pShare *SharedFile) BeforeCreate(tx *gorm.DB) (err error) {
@@ -28,4 +28,10 @@ func (pShare *SharedFile) BeforeCreate(tx *gorm.DB) (err error) {
 func (pShare *SharedFile) Create() error {
 	res := db.GetDB().Create(pShare)
 	return res.Error
+}
+
+func FindSharedFile(shared_file_uuid string) (*SharedFile, error) {
+	p_shared_file := &SharedFile{}
+	res := db.GetDB().Where("uuid = ?", shared_file_uuid).Find(p_shared_file)
+	return p_shared_file, res.Error
 }

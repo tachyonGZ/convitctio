@@ -18,20 +18,9 @@ type FileSystem struct {
 	Adapter adapter.IFileSystemAdapter
 }
 
-type GlobalFileSystem struct {
-	Target  model.File
-	Adapter adapter.IFileSystemAdapter
-}
-
 var fileSystemPool = sync.Pool{
 	New: func() any {
 		return &FileSystem{}
-	},
-}
-
-var globalFileSystemPool = sync.Pool{
-	New: func() any {
-		return &GlobalFileSystem{}
 	},
 }
 
@@ -39,28 +28,12 @@ func GetFileSystem() *FileSystem {
 	return fileSystemPool.Get().(*FileSystem)
 }
 
-func GetGlobalFileSystem() *GlobalFileSystem {
-	return globalFileSystemPool.Get().(*GlobalFileSystem)
-}
-
 func (fs *FileSystem) DispatchAdapter() error {
 	fs.Adapter = local.FileSystemAdapter{}
 	return nil
 }
 
-func (fs *GlobalFileSystem) DispatchAdapter() error {
-	fs.Adapter = local.FileSystemAdapter{}
-	return nil
-}
-
-func NewFileSystem(Owner *model.User) *FileSystem {
-	fs := GetFileSystem()
-	fs.Owner = *Owner
-	fs.DispatchAdapter()
-	return fs
-}
-
-func NewFileSystem2(owner_id string) (fs *FileSystem, err error) {
+func NewFileSystem(owner_id string) (fs *FileSystem, err error) {
 	fs = GetFileSystem()
 	pOwner, e := model.FindUser(owner_id)
 	if e != nil {
@@ -72,10 +45,16 @@ func NewFileSystem2(owner_id string) (fs *FileSystem, err error) {
 	return
 }
 
-func NewGlobalFileSystem(owner_id string) *GlobalFileSystem {
-	fs := GetGlobalFileSystem()
-	fs.DispatchAdapter()
-	return fs
+func (fs *FileSystem) Download(file_id string) (rsc util.ReadSeekCloser, err error) {
+
+	file, e := model.FindUserFile(fs.Owner.UUID, file_id)
+	if e != nil {
+		err = fmt.Errorf("find user file fail")
+		return
+	}
+
+	rsc, _ = fs.Adapter.Get(file.Path)
+	return
 }
 
 func (fs *FileSystem) GrenateSavePath(fmd *FileHead, pFile *model.File) (save_path string, err error) {
@@ -85,7 +64,7 @@ func (fs *FileSystem) GrenateSavePath(fmd *FileHead, pFile *model.File) (save_pa
 	//return path.Join("upload", strUserID, strPath, strName)
 	pDir, e := model.FindUserDirectory(fs.Owner.UUID, pFile.DirectoryUUID)
 	if e != nil {
-		err = fmt.Errorf(e.Error())
+		err = fmt.Errorf("not find direcotory")
 		return
 	}
 	save_path = path.Join("upload", fs.Owner.UUID, pDir.UUID, pFile.UUID)
@@ -105,12 +84,6 @@ func (fs *FileSystem) Upload(head *FileHead, body IFileBody, placehodler_id stri
 	pPlaceholder.PlaceholderToFile()
 }
 
-func (fs *GlobalFileSystem) Download(owner_id string, file_id string) (rsc util.ReadSeekCloser) {
-	file, _ := model.FindUserFile(owner_id, file_id)
-	rsc, _ = fs.Adapter.Get(file.Path)
-	return
-}
-
 func (fs *FileSystem) GetDownloadURL(objectID uint, sessionID string) string {
 
 	source := fs.Adapter.Source(sessionID)
@@ -118,10 +91,14 @@ func (fs *FileSystem) GetDownloadURL(objectID uint, sessionID string) string {
 	return source
 }
 
-func (fs *FileSystem) GetFileHead(fileID uint) (head *FileHead) {
+func (fs *FileSystem) GetFileHead(file_id string) (p_head *FileHead, err error) {
 
-	file, _ := model.GetFileByID(fileID, fs.Owner.ID)
-	head = &FileHead{
+	file, e := model.FindUserFile(file_id, fs.Owner.UUID)
+	if e != nil {
+		err = fmt.Errorf("invalid file id")
+	}
+
+	p_head = &FileHead{
 		Name: file.Name,
 	}
 	return
@@ -165,7 +142,7 @@ func (fs *FileSystem) CreatePlaceHolder(pHead *FileHead, dir_id string) (placeho
 	return
 }
 
-func (fs *FileSystem) CreateDirectoryByPath(dirPath string) (dir_id string) {
+func (fs *FileSystem) CreateDirectoryByPath(dirPath string) (dir_id string, err error) {
 	dirPath = path.Clean(dirPath)
 	pathList := util.SplitPath(dirPath)
 
@@ -173,11 +150,21 @@ func (fs *FileSystem) CreateDirectoryByPath(dirPath string) (dir_id string) {
 	for _, dirName := range pathList {
 
 		if dirName == "/" {
-			currentDir, _ = fs.Owner.Root()
+			pRoot, e := fs.Owner.Root()
+			if e != nil {
+				err = fmt.Errorf("get root fail")
+				return
+			}
+
+			currentDir = pRoot
 			continue
 		}
 
-		pChild, exist, _ := currentDir.GetChild(dirName)
+		pChild, exist, e := currentDir.GetChild(dirName)
+		if e != nil {
+			err = fmt.Errorf("get child fail")
+			return
+		}
 		if exist {
 			currentDir = pChild
 			continue
@@ -206,12 +193,21 @@ func (fs *FileSystem) OpenDirectory(dirPath string) (dir_id string, exists bool,
 	for _, dirName := range pathList {
 
 		if dirName == "/" {
-			currentDir, _ = fs.Owner.Root()
+			pRoot, e := fs.Owner.Root()
+			if e != nil {
+				err = fmt.Errorf("get root fail")
+				return
+			}
+
+			currentDir = pRoot
 			continue
 		}
 
-		childDir, exist, _ := currentDir.GetChild(dirName)
-
+		childDir, exist, e := currentDir.GetChild(dirName)
+		if e != nil {
+			err = fmt.Errorf("get child fail")
+			return
+		}
 		if !exist {
 			exists = false
 			return
@@ -228,4 +224,20 @@ func (fs *FileSystem) ReadDirectory2(dir *model.Directory) ([]model.Directory, [
 	childDir, _ := dir.GetChildDirectory()
 	childFile, _ := dir.GetChildFile()
 	return childDir, childFile
+}
+
+func (fs *FileSystem) RenameFile(file_id string, name string) (err error) {
+	pFile, e := model.FindUserFile(fs.Owner.UUID, file_id)
+	if e != nil {
+		err = fmt.Errorf("invalid file id")
+		return
+	}
+
+	e = pFile.Rename(name)
+	if e != nil {
+		err = fmt.Errorf("file rename fail")
+		return
+	}
+
+	return
 }

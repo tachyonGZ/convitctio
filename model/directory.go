@@ -54,7 +54,7 @@ func (d *Directory) BeforeDelete(tx *gorm.DB) (err error) {
 func (d *Directory) GetChild(dirName string) (*Directory, bool, error) {
 	pChildDir := &Directory{}
 	res := db.GetDB().
-		Where("parent_uuid = ? AND owner_uuid = ? AND name = ?", d.ID, d.OwnerUUID, dirName).
+		Where("parent_uuid = ? AND owner_uuid = ? AND name = ?", d.UUID, d.OwnerUUID, dirName).
 		Find(pChildDir)
 	return pChildDir, res.RowsAffected != 0, res.Error
 }
