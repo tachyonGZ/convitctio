@@ -10,7 +10,7 @@ import (
 
 type File struct {
 	gorm.Model
-	UUID string `gorm:"column:uuid"`
+	UUID string `gorm:"column:uuid;primarykey"`
 
 	DirectoryUUID string `gorm:"column:directory_uuid"`
 	OwnerUUID     string `gorm:"column:owner_uuid"`

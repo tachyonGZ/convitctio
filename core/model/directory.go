@@ -9,8 +9,7 @@ import (
 )
 
 type Directory struct {
-	gorm.Model
-	UUID string `gorm:"column:uuid"`
+	UUID string `gorm:"column:uuid;primarykey"`
 
 	OwnerUUID  string  `gorm:"column:owner_uuid;index:owner_uuid"`
 	ParentUUID *string `gorm:"column:parent_uuid;index:parent_id;unique_index:idx_only_one_name"`
@@ -33,13 +32,13 @@ func (d *Directory) BeforeDelete(tx *gorm.DB) (err error) {
 	//  }
 
 	childDir := Directory{}
-	resDir := db.GetDB().Where("parent_id = ?", d.ID).Find(&childDir)
+	resDir := db.GetDB().Where("parent_uuid = ?", d.UUID).Find(&childDir)
 	if resDir.Error != nil {
 		err = resDir.Error
 	}
 
 	childFile := File{}
-	resFile := db.GetDB().Where("directory_id = ?", d.ID).Find(&childFile)
+	resFile := db.GetDB().Where("directory_uuid = ?", d.UUID).Find(&childFile)
 	if resFile.Error != nil {
 		err = resFile.Error
 	}

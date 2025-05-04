@@ -1,10 +1,12 @@
 package main
 
 import (
+	"conviction/config"
 	"conviction/controller"
 	"conviction/db"
 	"conviction/middleware"
 	"conviction/model"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -16,6 +18,8 @@ import (
 )
 
 func init() {
+	config.Init()
+	fmt.Println("helloworld")
 	db.InitDB()
 	model.Migration(db.GetDB())
 }
@@ -51,14 +55,15 @@ func InitRouter() *gin.Engine {
 
 	v1 := r.Group("/api")
 
+	// user session
 	store := memstore.NewStore([]byte("secret"))
 	v1.Use(sessions.Sessions("convictio", store))
 
-	// user session
-	v1.Use(middleware.CurrentUser())
-
 	// disable cache
 	v1.Use(middleware.NoCache())
+
+	// rate limiter
+	v1.Use(middleware.RateLimit(10, 1))
 
 	user := v1.Group("user")
 	{

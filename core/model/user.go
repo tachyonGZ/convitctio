@@ -10,7 +10,7 @@ import (
 
 type User struct {
 	gorm.Model
-	UUID string `gorm:"column:uuid"`
+	UUID string `gorm:"column:uuid;primarykey"`
 
 	Username string `gorm:"size:50"`
 	Password string `json:"-"`

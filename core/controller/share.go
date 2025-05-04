@@ -1,8 +1,8 @@
 package controller
 
 import (
+	"conviction/cache"
 	"conviction/filesystem"
-	"conviction/memocache"
 	"conviction/serializer"
 	"time"
 
@@ -84,7 +84,7 @@ func CreateSharedFileDownloadSession(c *gin.Context) {
 		DestType: serializer.SharedFile,
 		DestID:   param.SharedFileID,
 	}
-	memocache.SetDownloadSession(key.String(), &session, ttl)
+	cache.SetDownloadSession(key.String(), &session, int64(ttl))
 
 	// get credential
 	credential := serializer.DownloadCredential{

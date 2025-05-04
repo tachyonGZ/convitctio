@@ -1,8 +1,8 @@
 package controller
 
 import (
+	"conviction/cache"
 	"conviction/filesystem"
-	"conviction/memocache"
 	"conviction/serializer"
 	"net/http"
 	"net/url"
@@ -26,7 +26,7 @@ func Download(c *gin.Context) {
 	user_id, _ := c.Get("user_id")
 
 	// get download session from cache
-	session, err := memocache.GetDownloadSession(param.SessionID)
+	session, err := cache.GetDownloadSession(param.SessionID)
 	if err != nil {
 		c.String(500, err.Error())
 		return
@@ -101,7 +101,7 @@ func Upload(c *gin.Context) {
 	fs, _ := filesystem.NewFileSystem(user_id.(string))
 
 	// get upload session from cache
-	pSession, err := memocache.GetUploadSession(param.SessionID)
+	pSession, err := cache.GetUploadSession(param.SessionID)
 	if err != nil {
 		c.String(500, err.Error())
 		return
@@ -118,7 +118,7 @@ func Upload(c *gin.Context) {
 	fs.Upload(&head, c.Request.Body, pSession.PlaceholderID)
 
 	// delete upload session in cache
-	memocache.DeleteUploadSession(pSession.Key)
+	cache.DeleteUploadSession(pSession.Key)
 
 	c.String(200, "")
 }

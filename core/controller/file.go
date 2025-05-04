@@ -1,8 +1,8 @@
 package controller
 
 import (
+	"conviction/cache"
 	"conviction/filesystem"
-	"conviction/memocache"
 	"conviction/model"
 	"conviction/serializer"
 	"conviction/util"
@@ -15,7 +15,7 @@ import (
 
 func CreateUploadSession(c *gin.Context) {
 
-	var ttl int = 6000
+	var ttl int64 = 6000
 	if os.Getenv("DEBUG") != "" {
 		ttl = 0
 	}
@@ -81,7 +81,7 @@ func CreateUploadSession(c *gin.Context) {
 		LastModified:   head.LastModified,
 		CallbackSecret: util.RandStringRunes(32),
 	}
-	memocache.SetUploadSession(key, &uploadSession, ttl)
+	cache.SetUploadSession(key, &uploadSession, ttl)
 
 	// get credential
 	credential := serializer.UploadCredential{
@@ -115,7 +115,7 @@ func CreateDownloadSession(c *gin.Context) {
 		DestType: serializer.PersonalFile,
 		DestID:   param.FileID,
 	}
-	memocache.SetDownloadSession(key, &session, ttl)
+	cache.SetDownloadSession(key, &session, int64(ttl))
 
 	// get credential
 	credential := serializer.DownloadCredential{
