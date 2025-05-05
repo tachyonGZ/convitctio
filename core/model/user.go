@@ -27,13 +27,13 @@ func (pUser *User) BeforeCreate(tx *gorm.DB) (err error) {
 
 func FindUser(user_uuid string) (*User, error) {
 	user := User{}
-	res := db.GetDB().Where("uuid", user_uuid).Find(&user)
+	res := db.GormDB.Where("uuid", user_uuid).Find(&user)
 	return &user, res.Error
 }
 
 func FindUserByUsername(username string) (User, error) {
 	var user User
-	result := db.GetDB().Where("username = ?", username).First(&user)
+	result := db.GormDB.Where("username = ?", username).First(&user)
 	return user, result.Error
 }
 
@@ -42,7 +42,7 @@ func (user *User) CheckPassword(password string) bool {
 }
 
 func (pUser *User) Create() error {
-	res := db.GetDB().Create(pUser)
+	res := db.GormDB.Create(pUser)
 	return res.Error
 }
 
@@ -56,6 +56,6 @@ func (user *User) AfterCreate(tx *gorm.DB) error {
 
 func (user *User) Root() (*Directory, error) {
 	pRootDir := &Directory{}
-	res := db.GetDB().Where("parent_uuid is NULL AND owner_uuid = ?", user.UUID).First(pRootDir)
+	res := db.GormDB.Where("parent_uuid is NULL AND owner_uuid = ?", user.UUID).First(pRootDir)
 	return pRootDir, res.Error
 }

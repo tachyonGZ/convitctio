@@ -19,16 +19,31 @@ import (
 
 func init() {
 	config.Init()
+
+	if config.SystemConfig.Debug {
+		gin.SetMode(gin.DebugMode)
+	} else {
+		gin.SetMode(gin.ReleaseMode)
+	}
+
 	fmt.Println("helloworld")
-	db.InitDB()
-	model.Migration(db.GetDB())
+
+	db.Init(
+		config.DatabaseConfig.Host,
+		config.DatabaseConfig.User,
+		config.DatabaseConfig.Password,
+		config.DatabaseConfig.Name,
+		config.DatabaseConfig.Port)
+
+	model.Migration(db.GormDB)
 }
 
 func main() {
 
 	// release database
 	defer func() {
-		db.ReleaseDB()
+		sqldb, _ := db.GormDB.DB()
+		sqldb.Close()
 	}()
 
 	// http server

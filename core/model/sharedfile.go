@@ -26,12 +26,12 @@ func (pShare *SharedFile) BeforeCreate(tx *gorm.DB) (err error) {
 }
 
 func (pShare *SharedFile) Create() error {
-	res := db.GetDB().Create(pShare)
+	res := db.GormDB.Create(pShare)
 	return res.Error
 }
 
 func FindSharedFile(shared_file_uuid string) (*SharedFile, error) {
 	p_shared_file := &SharedFile{}
-	res := db.GetDB().Where("uuid = ?", shared_file_uuid).Find(p_shared_file)
+	res := db.GormDB.Where("uuid = ?", shared_file_uuid).Find(p_shared_file)
 	return p_shared_file, res.Error
 }

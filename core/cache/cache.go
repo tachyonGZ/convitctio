@@ -17,11 +17,8 @@ type ValkeyInstance struct {
 var instance ValkeyInstance
 
 func Init() {
-
-	cfg := config.GetCacheConfig()
-
 	client, err := valkey.NewClient(valkey.ClientOption{
-		InitAddress: []string{cfg.Address},
+		InitAddress: []string{config.CacheConfig.Address},
 	})
 	if err != nil {
 		panic(err)

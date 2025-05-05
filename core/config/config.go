@@ -14,5 +14,6 @@ func Init() {
 		panic(fmt.Errorf("fatal config file: %s", err))
 	}
 
+	InitSystemConfig(viper.Sub("system"))
 	InitCacheConfig(viper.Sub("cache"))
 }

@@ -32,13 +32,13 @@ func (d *Directory) BeforeDelete(tx *gorm.DB) (err error) {
 	//  }
 
 	childDir := Directory{}
-	resDir := db.GetDB().Where("parent_uuid = ?", d.UUID).Find(&childDir)
+	resDir := db.GormDB.Where("parent_uuid = ?", d.UUID).Find(&childDir)
 	if resDir.Error != nil {
 		err = resDir.Error
 	}
 
 	childFile := File{}
-	resFile := db.GetDB().Where("directory_uuid = ?", d.UUID).Find(&childFile)
+	resFile := db.GormDB.Where("directory_uuid = ?", d.UUID).Find(&childFile)
 	if resFile.Error != nil {
 		err = resFile.Error
 	}
@@ -52,39 +52,39 @@ func (d *Directory) BeforeDelete(tx *gorm.DB) (err error) {
 
 func (d *Directory) GetChild(dirName string) (*Directory, bool, error) {
 	pChildDir := &Directory{}
-	res := db.GetDB().
+	res := db.GormDB.
 		Where("parent_uuid = ? AND owner_uuid = ? AND name = ?", d.UUID, d.OwnerUUID, dirName).
 		Find(pChildDir)
 	return pChildDir, res.RowsAffected != 0, res.Error
 }
 
 func (pDir *Directory) Create() error {
-	res := db.GetDB().Create(pDir)
+	res := db.GormDB.Create(pDir)
 	return res.Error
 }
 
 func (d *Directory) GetChildDirectory() (childDir []Directory, err error) {
-	res := db.GetDB().Where("parent_uuid = ?", d.UUID).Find(&childDir)
+	res := db.GormDB.Where("parent_uuid = ?", d.UUID).Find(&childDir)
 	err = res.Error
 	return
 }
 
 func (d *Directory) GetChildFile() (childFile []File, err error) {
-	res := db.GetDB().Where("directory_uuid = ?", d.UUID).Find(&childFile)
+	res := db.GormDB.Where("directory_uuid = ?", d.UUID).Find(&childFile)
 	err = res.Error
 	return
 }
 
 func FindUserDirectory(user_uuid string, dir_uuid string) (*Directory, error) {
 	dir := Directory{}
-	res := db.GetDB().
+	res := db.GormDB.
 		Where("owner_uuid = ? AND uuid = ?", user_uuid, dir_uuid).
 		Find(&dir)
 	return &dir, res.Error
 }
 
 func DeleteUserDirectory(user_uuid string, dir_uuid string) error {
-	res := db.GetDB().
+	res := db.GormDB.
 		Unscoped().
 		Where("owner_uuid = ? AND uuid = ?", user_uuid, dir_uuid).
 		Delete(&Directory{})
@@ -93,7 +93,7 @@ func DeleteUserDirectory(user_uuid string, dir_uuid string) error {
 
 func GetUserRootID(user_uuid string) (string, error) {
 	root_dir := Directory{}
-	res := db.GetDB().
+	res := db.GormDB.
 		Where("owner_uuid = ? AND parent_uuid is NULL", user_uuid).
 		Find(&root_dir)
 	return root_dir.UUID, res.Error
